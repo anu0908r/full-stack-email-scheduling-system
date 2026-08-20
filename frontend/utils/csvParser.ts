@@ -34,30 +34,27 @@ export function parseLeadFileContent(content: string): ParseResult {
       }
     }
 
-    // Try finding email cell
-    let extractedEmail = '';
+    // Try finding email cell(s) — extract ALL valid emails from all cells
+    let foundAny = false;
 
     if (emailColumnIndex !== null && cells[emailColumnIndex]) {
       const candidate = cells[emailColumnIndex].trim().toLowerCase();
       if (emailRegex.test(candidate)) {
-        extractedEmail = candidate;
+        validSet.add(candidate);
+        foundAny = true;
       }
     }
 
-    // Fallback search across all cells if specific column didn't yield an email
-    if (!extractedEmail) {
-      for (const cell of cells) {
-        const cleanCell = cell.trim().toLowerCase().replace(/^["']|["']$/g, '');
-        if (emailRegex.test(cleanCell)) {
-          extractedEmail = cleanCell;
-          break;
-        }
+    // Search across all cells for emails
+    for (const cell of cells) {
+      const cleanCell = cell.trim().toLowerCase().replace(/^["']|["']$/g, '');
+      if (emailRegex.test(cleanCell)) {
+        validSet.add(cleanCell);
+        foundAny = true;
       }
     }
 
-    if (extractedEmail) {
-      validSet.add(extractedEmail);
-    } else {
+    if (!foundAny) {
       // Don't report header row as invalid if it was line 1
       if (index === 0 && /email/i.test(lineText)) return;
       invalidLines.push({

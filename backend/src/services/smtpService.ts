@@ -21,6 +21,22 @@ export interface SendMailResult {
 // Memory cache for auto-generated Ethereal accounts per sender email
 const etherealAccountsCache = new Map<string, { user: string; pass: string }>();
 
+// Cache SMTP transporters per sender config to avoid recreating per email
+const transporterCache = new Map<string, nodemailer.Transporter>();
+
+function getTransporterKey(host: string, port: number, user: string, pass: string): string {
+  return `${host}:${port}:${user}:${pass}`;
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 export const sendEmailViaSMTP = async (options: SendMailOptions): Promise<SendMailResult> => {
   let host = options.smtpHost || config.etherealHost;
   let port = options.smtpPort || config.etherealPort;
@@ -44,21 +60,26 @@ export const sendEmailViaSMTP = async (options: SendMailOptions): Promise<SendMa
     }
   }
 
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: {
-      user,
-      pass,
-    },
-  });
+  const cacheKey = getTransporterKey(host, port, user!, pass!);
+  let transporter = transporterCache.get(cacheKey);
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user, pass },
+    });
+    transporterCache.set(cacheKey, transporter);
+  }
+
+  // HTML-escape body to prevent injection, then convert newlines to <br/>
+  const safeHtml = escapeHtml(options.body).replace(/\n/g, '<br/>');
 
   const mailOptions = {
     from: `"${options.senderName}" <${options.senderEmail}>`,
     to: options.recipient,
     subject: options.subject,
-    html: options.body.replace(/\n/g, '<br/>'),
+    html: safeHtml,
     text: options.body,
   };
 

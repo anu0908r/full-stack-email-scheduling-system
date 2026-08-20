@@ -30,28 +30,25 @@ export function parseLeadFileContent(content: string): ParseResult {
       }
     }
 
-    let extractedEmail = '';
+    let foundAny = false;
 
     if (emailColumnIndex !== null && cells[emailColumnIndex]) {
       const candidate = cells[emailColumnIndex].trim().toLowerCase();
       if (emailRegex.test(candidate)) {
-        extractedEmail = candidate;
+        validSet.add(candidate);
+        foundAny = true;
       }
     }
 
-    if (!extractedEmail) {
-      for (const cell of cells) {
-        const cleanCell = cell.trim().toLowerCase().replace(/^["']|["']$/g, '');
-        if (emailRegex.test(cleanCell)) {
-          extractedEmail = cleanCell;
-          break;
-        }
+    for (const cell of cells) {
+      const cleanCell = cell.trim().toLowerCase().replace(/^["']|["']$/g, '');
+      if (emailRegex.test(cleanCell)) {
+        validSet.add(cleanCell);
+        foundAny = true;
       }
     }
 
-    if (extractedEmail) {
-      validSet.add(extractedEmail);
-    } else {
+    if (!foundAny) {
       if (index === 0 && /email/i.test(lineText)) return;
       invalidLines.push({
         line: lineNum,

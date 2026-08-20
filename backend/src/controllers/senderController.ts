@@ -7,13 +7,21 @@ import { createSenderSchema } from './emailController';
 export class SenderController {
   public static async listSenders(req: AuthRequest, res: Response): Promise<void> {
     try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(401).json({ error: 'User unauthorized' });
+        return;
+      }
+
       let senders = await prisma.sender.findMany({
+        where: { userId },
         orderBy: { createdAt: 'desc' },
       });
 
       if (senders.length === 0) {
         const defaultSender = await prisma.sender.create({
           data: {
+            userId,
             email: 'outreach@reachinbox.ai',
             displayName: 'ReachInbox Primary Sender',
             hourlyLimit: config.maxEmailsPerHourPerSender,
@@ -30,6 +38,12 @@ export class SenderController {
 
   public static async createSender(req: AuthRequest, res: Response): Promise<void> {
     try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(401).json({ error: 'User unauthorized' });
+        return;
+      }
+
       const parsed = createSenderSchema.safeParse(req.body);
       if (!parsed.success) {
         const errors = parsed.error.issues.map((i) => i.message).join('; ');
@@ -41,6 +55,7 @@ export class SenderController {
 
       const sender = await prisma.sender.create({
         data: {
+          userId,
           email: email.trim().toLowerCase(),
           displayName,
           hourlyLimit: hourlyLimit ?? config.maxEmailsPerHourPerSender,
@@ -59,11 +74,22 @@ export class SenderController {
 
   public static async deleteSender(req: AuthRequest, res: Response): Promise<void> {
     try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(401).json({ error: 'User unauthorized' });
+        return;
+      }
+
       const { id } = req.params;
 
       const sender = await prisma.sender.findUnique({ where: { id } });
       if (!sender) {
         res.status(404).json({ error: 'Sender not found.' });
+        return;
+      }
+
+      if (sender.userId !== userId) {
+        res.status(403).json({ error: 'Access denied.' });
         return;
       }
 

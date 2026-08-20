@@ -15,8 +15,8 @@ export const emailQueue = new Queue<EmailJobData>(EMAIL_QUEUE_NAME, {
       type: 'exponential',
       delay: 5000,
     },
-    removeOnComplete: 1000,
-    removeOnFail: 5000,
+    removeOnComplete: { age: 3600 },    // Remove completed jobs after 1 hour
+    removeOnFail: { age: 86400 },       // Remove failed jobs after 24 hours
   },
 });
 
