@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --canvas: #F3ECE5;
+    --surface-paper: #F7F1EB;
+    --surface-layer: #E8DDD3;
+    --grid-line: #E1D4C8;
+    --ink: #1F2736;
+    --ink-soft: #445166;
+    --ink-muted: #798392;
+    --accent: #D63A35;
+    --accent-soft: #E86A65;
+    --dark-surface: #1F232B;
+  }
+
+  body {
+    background-color: var(--canvas);
+    color: var(--ink);
+    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, .font-serif-display {
+    font-family: 'Libre Bodoni', Georgia, serif;
+  }
+}
+
+/* Blueprint Drafting Grid Background Pattern */
+.bg-drafting-grid {
+  background-image: 
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Neo-brutalist / Architectural structural borders */
+.border-blueprint {
+  border: 3px solid var(--ink);
+  box-shadow: 4px 4px 0px var(--ink);
+}
+
+.border-blueprint-sm {
+  border: 2px solid var(--ink);
+  box-shadow: 2px 2px 0px var(--ink);
+}
+
+.border-blueprint-interactive {
+  border: 3px solid var(--ink);
+  box-shadow: 4px 4px 0px var(--ink);
+  transition: all 0.15s ease-in-out;
+}
+
+.border-blueprint-interactive:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0px var(--ink);
+}
+
+.border-blueprint-interactive:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0px var(--ink);
+}

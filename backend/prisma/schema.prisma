@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String     @id @default(uuid())
+  googleId  String     @unique
+  name      String
+  email     String     @unique
+  avatar    String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  campaigns Campaign[]
+}
+
+model Sender {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  displayName String
+  smtpHost    String?
+  smtpPort    Int?
+  smtpUser    String?
+  smtpPass    String?
+  hourlyLimit Int      @default(200)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  emails      Email[]
+}
+
+model Campaign {
+  id                   String   @id @default(uuid())
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject              String
+  body                 String
+  startTime            DateTime
+  delayBetweenEmailsMs Int      @default(2000)
+  hourlyLimit          Int      @default(200)
+  status               String   @default("SCHEDULED") // SCHEDULED, PROCESSING, COMPLETED, FAILED
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  emails               Email[]
+}
+
+model Email {
+  id                 String    @id @default(uuid())
+  campaignId         String
+  campaign           Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  senderId           String
+  sender             Sender    @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  recipient          String
+  subject            String
+  body               String
+  scheduledAt        DateTime
+  sentAt             DateTime?
+  status             String    @default("SCHEDULED") // SCHEDULED, PROCESSING, SENT, FAILED
+  attempts           Int       @default(0)
+  bullJobId          String?
+  errorMessage       String?
+  idempotencyKey     String    @unique
+  etherealMessageId  String?
+  etherealPreviewUrl String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([senderId])
+  @@index([campaignId])
+  @@index([idempotencyKey])
+}
