@@ -56,4 +56,30 @@ export class SenderController {
       res.status(500).json({ error: err.message });
     }
   }
+
+  public static async deleteSender(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+
+      const sender = await prisma.sender.findUnique({ where: { id } });
+      if (!sender) {
+        res.status(404).json({ error: 'Sender not found.' });
+        return;
+      }
+
+      const activeEmails = await prisma.email.count({
+        where: { senderId: id, status: { in: ['SCHEDULED', 'PROCESSING'] } },
+      });
+
+      if (activeEmails > 0) {
+        res.status(400).json({ error: `Cannot delete sender with ${activeEmails} active email(s). Wait for them to complete or fail.` });
+        return;
+      }
+
+      await prisma.sender.delete({ where: { id } });
+      res.json({ message: 'Sender deleted successfully' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
 }

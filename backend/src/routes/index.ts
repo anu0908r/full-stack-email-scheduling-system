@@ -16,10 +16,12 @@ router.get('/auth/google/url', AuthController.getGoogleAuthUrl);
 router.post('/auth/google/callback', AuthController.googleCallback);
 router.post('/auth/dev-login', AuthController.devLogin);
 router.get('/auth/me', authenticateJwt, AuthController.getCurrentUser);
+router.post('/auth/logout', authenticateJwt, AuthController.logout);
 
 // Senders Routes
 router.get('/senders', authenticateJwt, SenderController.listSenders);
 router.post('/senders', authenticateJwt, SenderController.createSender);
+router.delete('/senders/:id', authenticateJwt, SenderController.deleteSender);
 
 // Email Scheduling Routes
 router.post('/emails/schedule', authenticateJwt, EmailController.scheduleEmails);

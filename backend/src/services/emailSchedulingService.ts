@@ -56,7 +56,9 @@ export class EmailSchedulingService {
 
     const startTime = params.startTime ? new Date(params.startTime) : new Date();
     const startMs = Math.max(startTime.getTime(), Date.now());
-    const delayBetweenMs = params.delayBetweenEmailsMs ?? sender.hourlyLimit ? Math.max(config.minEmailDelayMs, params.delayBetweenEmailsMs || 2000) : config.minEmailDelayMs;
+    const delayBetweenMs = params.delayBetweenEmailsMs != null
+      ? Math.max(config.minEmailDelayMs, params.delayBetweenEmailsMs)
+      : config.minEmailDelayMs;
     const hourlyLimit = params.hourlyLimit ?? sender.hourlyLimit ?? config.maxEmailsPerHourPerSender;
 
     // Create Campaign DB Record
@@ -76,7 +78,11 @@ export class EmailSchedulingService {
     const createdEmails = [];
     let currentScheduleMs = startMs;
     let countInCurrentHourWindow = 0;
-    let windowStartMs = new Date(startMs).setMinutes(0, 0, 0);
+
+    // Use UTC hour window to match rate limiter Redis keys
+    const startDate = new Date(startMs);
+    const windowStartMs = Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate(), startDate.getUTCHours(), 0, 0, 0);
+    let currentWindowStartMs = windowStartMs;
 
     for (let i = 0; i < validRecipients.length; i++) {
       const recipient = validRecipients[i];
@@ -85,8 +91,8 @@ export class EmailSchedulingService {
       countInCurrentHourWindow++;
       if (countInCurrentHourWindow > hourlyLimit) {
         // Bump schedule to next hour window
-        windowStartMs += 3600 * 1000;
-        currentScheduleMs = Math.max(currentScheduleMs, windowStartMs);
+        currentWindowStartMs += 3600 * 1000;
+        currentScheduleMs = Math.max(currentScheduleMs, currentWindowStartMs);
         countInCurrentHourWindow = 1;
       }
 

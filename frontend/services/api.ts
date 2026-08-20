@@ -19,6 +19,17 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && typeof window !== 'undefined') {
+      localStorage.removeItem('reachinbox_jwt_token');
+      window.location.reload();
+    }
+    return Promise.reject(error);
+  }
+);
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -31,6 +42,8 @@ export interface Sender {
   email: string;
   displayName: string;
   hourlyLimit: number;
+  smtpHost?: string | null;
+  smtpPort?: number | null;
 }
 
 export interface EmailRecord {
@@ -46,6 +59,18 @@ export interface EmailRecord {
   etherealMessageId?: string | null;
   etherealPreviewUrl?: string | null;
   sender: Sender;
+  campaign?: { id: string; subject: string };
+}
+
+export interface ScheduleResponse {
+  message: string;
+  data: {
+    campaign: { id: string; subject: string; status: string };
+    recipientCount: number;
+    invalidCount: number;
+    invalidRecipients: string[];
+    scheduledEmails: number;
+  };
 }
 
 export const authService = {
@@ -65,6 +90,10 @@ export const authService = {
     const res = await api.get('/auth/me');
     return res.data.user;
   },
+  logout: async () => {
+    const res = await api.post('/auth/logout');
+    return res.data;
+  },
 };
 
 export const senderService = {
@@ -72,9 +101,12 @@ export const senderService = {
     const res = await api.get('/senders');
     return res.data.senders;
   },
-  createSender: async (senderData: Partial<Sender>): Promise<Sender> => {
+  createSender: async (senderData: Partial<Sender> & { smtpUser?: string; smtpPass?: string }): Promise<Sender> => {
     const res = await api.post('/senders', senderData);
     return res.data.sender;
+  },
+  deleteSender: async (id: string): Promise<void> => {
+    await api.delete(`/senders/${id}`);
   },
 };
 
@@ -87,7 +119,7 @@ export const emailService = {
     startTime?: string;
     delayBetweenEmailsMs?: number;
     hourlyLimit?: number;
-  }) => {
+  }): Promise<ScheduleResponse> => {
     const res = await api.post('/emails/schedule', params);
     return res.data;
   },
@@ -98,5 +130,9 @@ export const emailService = {
   getSentEmails: async (page = 1, limit = 50) => {
     const res = await api.get(`/emails/sent?page=${page}&limit=${limit}`);
     return res.data;
+  },
+  getEmailById: async (id: string) => {
+    const res = await api.get(`/emails/${id}`);
+    return res.data.email;
   },
 };

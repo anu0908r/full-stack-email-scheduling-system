@@ -112,9 +112,14 @@ export class AuthController {
   }
 
   /**
-   * Developer login endpoint for seamless testing & demonstration
+   * Developer login endpoint — only available in development/test mode
    */
   public static async devLogin(req: Request, res: Response): Promise<void> {
+    if (process.env.NODE_ENV === 'production') {
+      res.status(403).json({ error: 'Dev login is disabled in production.' });
+      return;
+    }
+
     try {
       const { email = 'demo.user@reachinbox.ai', name = 'Demo Engineer' } = req.body;
       const googleId = `dev-google-${email}`;
@@ -179,5 +184,12 @@ export class AuthController {
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
+  }
+
+  /**
+   * Logout — client-side token removal; server-side is stateless JWT
+   */
+  public static async logout(_req: Request, res: Response): Promise<void> {
+    res.json({ message: 'Logged out successfully' });
   }
 }
