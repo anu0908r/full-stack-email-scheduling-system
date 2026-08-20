@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { prisma } from '../db/prisma';
 import { config } from '../config';
+import { createSenderSchema } from './emailController';
 
 export class SenderController {
   public static async listSenders(req: AuthRequest, res: Response): Promise<void> {
@@ -10,7 +11,6 @@ export class SenderController {
         orderBy: { createdAt: 'desc' },
       });
 
-      // If no sender exists yet, auto-provision default sender
       if (senders.length === 0) {
         const defaultSender = await prisma.sender.create({
           data: {
@@ -30,20 +30,22 @@ export class SenderController {
 
   public static async createSender(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { email, displayName, hourlyLimit, smtpHost, smtpPort, smtpUser, smtpPass } = req.body;
-
-      if (!email || !displayName) {
-        res.status(400).json({ error: 'Email and displayName are required fields.' });
+      const parsed = createSenderSchema.safeParse(req.body);
+      if (!parsed.success) {
+        const errors = parsed.error.issues.map((i) => i.message).join('; ');
+        res.status(400).json({ error: `Validation failed: ${errors}` });
         return;
       }
+
+      const { email, displayName, hourlyLimit, smtpHost, smtpPort, smtpUser, smtpPass } = parsed.data;
 
       const sender = await prisma.sender.create({
         data: {
           email: email.trim().toLowerCase(),
           displayName,
-          hourlyLimit: hourlyLimit ? parseInt(hourlyLimit, 10) : config.maxEmailsPerHourPerSender,
+          hourlyLimit: hourlyLimit ?? config.maxEmailsPerHourPerSender,
           smtpHost: smtpHost || null,
-          smtpPort: smtpPort ? parseInt(smtpPort, 10) : null,
+          smtpPort: smtpPort ?? null,
           smtpUser: smtpUser || null,
           smtpPass: smtpPass || null,
         },

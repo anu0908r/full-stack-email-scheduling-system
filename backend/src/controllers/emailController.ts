@@ -1,7 +1,28 @@
 import { Response } from 'express';
+import { z } from 'zod';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { EmailSchedulingService } from '../services/emailSchedulingService';
 import { prisma } from '../db/prisma';
+
+const scheduleEmailsSchema = z.object({
+  senderId: z.string().min(1, 'senderId is required'),
+  subject: z.string().min(1, 'Subject is required').max(200),
+  body: z.string().min(1, 'Body is required'),
+  recipients: z.array(z.string()).min(1, 'At least one recipient is required'),
+  startTime: z.string().optional(),
+  delayBetweenEmailsMs: z.coerce.number().int().positive().optional(),
+  hourlyLimit: z.coerce.number().int().positive().optional(),
+});
+
+const createSenderSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  displayName: z.string().min(1, 'Display name is required').max(100),
+  hourlyLimit: z.coerce.number().int().positive().max(10000).optional(),
+  smtpHost: z.string().optional(),
+  smtpPort: z.coerce.number().int().positive().max(65535).optional(),
+  smtpUser: z.string().optional(),
+  smtpPass: z.string().optional(),
+});
 
 export class EmailController {
   /**
@@ -15,12 +36,14 @@ export class EmailController {
         return;
       }
 
-      const { senderId, subject, body, recipients, startTime, delayBetweenEmailsMs, hourlyLimit } = req.body;
-
-      if (!senderId || !subject || !body || !Array.isArray(recipients) || recipients.length === 0) {
-        res.status(400).json({ error: 'Missing required parameters: senderId, subject, body, recipients array' });
+      const parsed = scheduleEmailsSchema.safeParse(req.body);
+      if (!parsed.success) {
+        const errors = parsed.error.issues.map((i) => i.message).join('; ');
+        res.status(400).json({ error: `Validation failed: ${errors}` });
         return;
       }
+
+      const { senderId, subject, body, recipients, startTime, delayBetweenEmailsMs, hourlyLimit } = parsed.data;
 
       const result = await EmailSchedulingService.scheduleCampaign({
         userId,
@@ -29,8 +52,8 @@ export class EmailController {
         body,
         recipients,
         startTime,
-        delayBetweenEmailsMs: delayBetweenEmailsMs ? parseInt(delayBetweenEmailsMs, 10) : undefined,
-        hourlyLimit: hourlyLimit ? parseInt(hourlyLimit, 10) : undefined,
+        delayBetweenEmailsMs,
+        hourlyLimit,
       });
 
       res.status(201).json({
@@ -44,19 +67,28 @@ export class EmailController {
   }
 
   /**
-   * List scheduled/processing emails
+   * List scheduled/processing emails (filtered by authenticated user)
    */
   public static async getScheduledEmails(req: AuthRequest, res: Response): Promise<void> {
     try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(401).json({ error: 'User unauthorized' });
+        return;
+      }
+
       const page = parseInt(req.query.page as string || '1', 10);
       const limit = parseInt(req.query.limit as string || '50', 10);
       const skip = (page - 1) * limit;
 
+      const whereClause = {
+        status: { in: ['SCHEDULED', 'PROCESSING'] as const },
+        campaign: { userId },
+      };
+
       const [emails, total] = await Promise.all([
         prisma.email.findMany({
-          where: {
-            status: { in: ['SCHEDULED', 'PROCESSING'] },
-          },
+          where: whereClause,
           include: {
             sender: { select: { id: true, email: true, displayName: true } },
             campaign: { select: { id: true, subject: true } },
@@ -65,9 +97,7 @@ export class EmailController {
           skip,
           take: limit,
         }),
-        prisma.email.count({
-          where: { status: { in: ['SCHEDULED', 'PROCESSING'] } },
-        }),
+        prisma.email.count({ where: whereClause }),
       ]);
 
       res.json({
@@ -80,19 +110,28 @@ export class EmailController {
   }
 
   /**
-   * List sent/failed emails
+   * List sent/failed emails (filtered by authenticated user)
    */
   public static async getSentEmails(req: AuthRequest, res: Response): Promise<void> {
     try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(401).json({ error: 'User unauthorized' });
+        return;
+      }
+
       const page = parseInt(req.query.page as string || '1', 10);
       const limit = parseInt(req.query.limit as string || '50', 10);
       const skip = (page - 1) * limit;
 
+      const whereClause = {
+        status: { in: ['SENT', 'FAILED'] as const },
+        campaign: { userId },
+      };
+
       const [emails, total] = await Promise.all([
         prisma.email.findMany({
-          where: {
-            status: { in: ['SENT', 'FAILED'] },
-          },
+          where: whereClause,
           include: {
             sender: { select: { id: true, email: true, displayName: true } },
             campaign: { select: { id: true, subject: true } },
@@ -101,9 +140,7 @@ export class EmailController {
           skip,
           take: limit,
         }),
-        prisma.email.count({
-          where: { status: { in: ['SENT', 'FAILED'] } },
-        }),
+        prisma.email.count({ where: whereClause }),
       ]);
 
       res.json({
@@ -116,10 +153,16 @@ export class EmailController {
   }
 
   /**
-   * Get email details by ID
+   * Get email details by ID (verify user owns the campaign)
    */
   public static async getEmailById(req: AuthRequest, res: Response): Promise<void> {
     try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(401).json({ error: 'User unauthorized' });
+        return;
+      }
+
       const { id } = req.params;
       const email = await prisma.email.findUnique({
         where: { id },
@@ -131,9 +174,16 @@ export class EmailController {
         return;
       }
 
+      if (email.campaign.userId !== userId) {
+        res.status(403).json({ error: 'Access denied' });
+        return;
+      }
+
       res.json({ email });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   }
 }
+
+export { createSenderSchema };
