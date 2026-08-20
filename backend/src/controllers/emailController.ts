@@ -81,8 +81,9 @@ export class EmailController {
       const limit = parseInt(req.query.limit as string || '50', 10);
       const skip = (page - 1) * limit;
 
+      const scheduledStatuses = ['SCHEDULED', 'PROCESSING'];
       const whereClause = {
-        status: { in: ['SCHEDULED', 'PROCESSING'] as const },
+        status: { in: scheduledStatuses },
         campaign: { userId },
       };
 
@@ -124,8 +125,9 @@ export class EmailController {
       const limit = parseInt(req.query.limit as string || '50', 10);
       const skip = (page - 1) * limit;
 
+      const sentStatuses = ['SENT', 'FAILED'];
       const whereClause = {
-        status: { in: ['SENT', 'FAILED'] as const },
+        status: { in: sentStatuses },
         campaign: { userId },
       };
 

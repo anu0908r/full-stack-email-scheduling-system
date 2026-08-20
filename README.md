@@ -1,86 +1,69 @@
-# ReachInbox // Distributed Email Scheduling & SMTP Infrastructure
+# ReachInbox — Distributed Email Scheduling & SMTP Infrastructure
 
-A production-grade, reliable, full-stack email scheduling system built with **Node.js, Express, TypeScript, PostgreSQL (Prisma), Redis, BullMQ, Nodemailer (Ethereal SMTP), and Next.js (Tailwind CSS v4)**.
+A production-grade, full-stack email scheduling system built with **Node.js, Express, TypeScript, PostgreSQL (Prisma ORM), Redis, BullMQ, Nodemailer (Ethereal SMTP), and Next.js 15 (Tailwind CSS v4)**.
 
 ---
 
-## 🏛️ System Architecture
+## Architecture
 
 ```
-                                  ┌────────────────────────┐
-                                  │   Next.js 15 Frontend  │
-                                  │ (Blueprint Editorial UI)│
-                                  └───────────┬────────────┘
-                                              │ HTTP / REST API
-                                              ▼
-                                  ┌────────────────────────┐
-                                  │ Express REST API Server│
-                                  └─────┬────────────┬─────┘
-                                        │            │
-                           Persist DB   │            │ Queue Delayed Job
-                           State & Logs │            │ ({ delay, emailId })
-                                        ▼            ▼
-                   ┌────────────────────────┐    ┌────────────────────────┐
-                   │ PostgreSQL (Prisma ORM)│    │   BullMQ (Redis Queue) │
-                   └────────────────────────┘    └───────────┬────────────┘
-                                                             │
-                                                             │ Fetch Due Job
-                                                             ▼
-                                                 ┌────────────────────────┐
-                                                 │ BullMQ Worker Service  │
-                                                 └───────────┬────────────┘
-                                                             │
-                                             ┌───────────────┼───────────────┐
-                                             │               │               │
-                                             ▼               ▼               ▼
-                                     Idempotency Lock   Rate Limiter   Ethereal SMTP
-                                     (PostgreSQL State) (Redis INCR)  (Nodemailer Mail)
+┌─────────────────────────────────┐
+│     Next.js 15 Frontend         │
+│  (Blueprint Editorial UI)       │
+└───────────────┬─────────────────┘
+                │ HTTP / REST API
+                ▼
+┌─────────────────────────────────┐
+│    Express REST API Server      │
+└──────┬──────────────┬───────────┘
+       │              │
+       ▼              ▼
+┌──────────────┐  ┌──────────────────┐
+│  PostgreSQL   │  │  BullMQ (Redis)  │
+│  (Prisma ORM) │  │  Delayed Jobs    │
+└──────────────┘  └───────┬──────────┘
+                           │ Fetch due job
+                           ▼
+               ┌──────────────────┐
+               │  BullMQ Worker   │
+               └───────┬──────────┘
+                       │
+          ┌────────────┼────────────┐
+          ▼            ▼            ▼
+   Idempotency    Rate Limiter   Ethereal
+   (PostgreSQL)   (Redis INCR)   SMTP
 ```
 
 ---
 
-## ✨ Key Technical Features & Guarantees
-
-1. **Strictly NO CRON**: Scheduling is handled entirely via **BullMQ delayed jobs** persisted in Redis.
-2. **Persistent Relational State**: PostgreSQL serves as the source of truth for email status (`SCHEDULED`, `PROCESSING`, `SENT`, `FAILED`), attempts, idempotency keys, and Ethereal preview links.
-3. **Restart & Crash Recovery**: If server or worker processes restart, BullMQ delayed jobs persist in Redis. A startup `RecoveryService` checks DB state, resets any interrupted `PROCESSING` jobs to `SCHEDULED`, and re-queues any missing jobs idempotently.
-4. **Idempotency & Duplicate Prevention**: Before sending, workers atomically transition job state in DB (`status: SCHEDULED -> PROCESSING`). Deterministic idempotency keys prevent duplicate logical sends even under concurrent retries or duplicate API requests.
-5. **Atomic Hourly Rate Limiting**: Per-sender hourly rate limits are managed in Redis via atomic `INCR` commands with 1-hour sliding/fixed window TTLs. When a limit is reached, jobs are **rescheduled to the next window** rather than dropped or failed.
-6. **Per-Sender Throttling Delay**: Minimum delay between consecutive email sends (`MIN_EMAIL_DELAY_MS`) is strictly enforced per sender across concurrent worker instances using Redis TTL locks.
-7. **Real Nodemailer Ethereal SMTP Integration**: Sends emails through Ethereal SMTP and captures live, viewable test inbox preview URLs (`etherealPreviewUrl`) rendered in the dashboard.
-8. **Real Google OAuth 2.0 & Dev Mode Auth**: Full Google OAuth authorization flow with JWT session management and user avatar header rendering, plus a quick dev login fallback for local evaluation.
-9. **Architectural Blueprint UI**: Styled according to `DESIGN.md` guidelines using Tailwind CSS v4, featuring a paper canvas `#F3ECE5`, ink typography `#1F2736`, drafting grid patterns, 4px structural neo-brutalist borders, and CSV lead list drag-and-drop parser.
-
----
-
-## 🚀 Quick Setup & Installation
+## Quick Setup
 
 ### Prerequisites
 
-- **Node.js**: v18+ (Tested on Node.js v26)
-- **PostgreSQL**: v14+ (Local port 5432)
-- **Redis**: v7+ (Local port 6379)
+- **Node.js** v18+ (tested on v26)
+- **PostgreSQL** v14+ (port 5432)
+- **Redis** v7+ (port 6379)
 
-### 1. Environment Configuration
+### 1. Start Infrastructure
 
-Copy `.env.example` to root `.env` and `backend/.env`:
+```bash
+# If using Docker
+docker-compose up -d
+
+# Or ensure PostgreSQL and Redis are running locally
+```
+
+### 2. Environment Configuration
 
 ```bash
 cp .env.example .env
 cp .env.example backend/.env
+cp .env.example frontend/.env.local
 ```
 
-Database & Redis connection strings in `.env`:
+Edit `.env` with your database URL, Redis URL, and optionally Google OAuth credentials.
 
-```env
-DATABASE_URL="postgresql://vishwaksen@localhost:5432/email_scheduler?schema=public"
-REDIS_URL="redis://localhost:6379"
-WORKER_CONCURRENCY=5
-MIN_EMAIL_DELAY_MS=2000
-MAX_EMAILS_PER_HOUR_PER_SENDER=200
-```
-
-### 2. Backend Setup & Database Migration
+### 3. Backend Setup
 
 ```bash
 cd backend
@@ -88,91 +71,224 @@ npm install
 npx prisma db push
 ```
 
-### 3. Frontend Setup
+### 4. Frontend Setup
 
 ```bash
-cd ../frontend
+cd frontend
 npm install --legacy-peer-deps
 ```
 
+### 5. Google OAuth (Optional)
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Create OAuth 2.0 Client ID
+3. Add `http://localhost:3000` as authorized origin
+4. Add `http://localhost:5001/api/auth/google/callback` as redirect URI
+5. Copy Client ID and Secret to `.env`
+
 ---
 
-## 🏃 Running the Application
+## Running
 
-You can start the backend API server, BullMQ worker, and Next.js frontend concurrently.
-
-### Terminal 1: Backend Express API
+### Terminal 1: Backend API
 
 ```bash
 cd backend
 npm run dev
-# Starts on http://localhost:5001
+# → http://localhost:5001
 ```
 
-### Terminal 2: BullMQ Worker Process
+### Terminal 2: BullMQ Worker
 
 ```bash
 cd backend
 npm run worker
-# Starts worker process with startup recovery reconciliation
+# Starts worker with startup recovery reconciliation
 ```
 
-### Terminal 3: Next.js Frontend Dashboard
+### Terminal 3: Frontend
 
 ```bash
 cd frontend
 npm run dev
-# Starts on http://localhost:3000
+# → http://localhost:3000
 ```
 
 ---
 
-## 🧪 Running Automated & Verification Test Suites
+## API Endpoints
 
-### Backend Unit & Integration Tests (Jest)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/api/health` | No | System health check |
+| `GET` | `/api/auth/google/url` | No | Google OAuth consent URL |
+| `POST` | `/api/auth/google/callback` | No | Exchange OAuth code for JWT |
+| `POST` | `/api/auth/dev-login` | No | Dev-only quick login (disabled in prod) |
+| `GET` | `/api/auth/me` | Yes | Get current authenticated user |
+| `POST` | `/api/auth/logout` | Yes | Logout |
+| `GET` | `/api/senders` | Yes | List sender profiles |
+| `POST` | `/api/senders` | Yes | Create new sender |
+| `DELETE` | `/api/senders/:id` | Yes | Delete sender (if no active emails) |
+| `POST` | `/api/emails/schedule` | Yes | Schedule email campaign batch |
+| `GET` | `/api/emails/scheduled` | Yes | List scheduled/queued emails (user-scoped) |
+| `GET` | `/api/emails/sent` | Yes | List sent/failed emails (user-scoped) |
+| `GET` | `/api/emails/:id` | Yes | Get single email details (user-scoped) |
+
+---
+
+## Key Technical Features
+
+### Scheduling (No Cron)
+
+All scheduling uses **BullMQ delayed jobs** persisted in Redis. No cron, no polling loops, no `node-cron`.
+
+### Persistence & Restart Recovery
+
+- **PostgreSQL** is the source of truth for email state (`SCHEDULED`, `PROCESSING`, `SENT`, `FAILED`)
+- **BullMQ** handles execution scheduling with Redis-persisted delayed jobs
+- On worker startup, `RecoveryService` reconciles stuck/missing jobs idempotently
+- Scheduled emails survive backend and worker restarts
+
+### Idempotency / Duplicate Prevention
+
+- Workers atomically transition email status `SCHEDULED → PROCESSING` using `updateMany` with status guard
+- Only one worker can claim a given email at a time
+- Deterministic idempotency keys (SHA-256 of `campaignId:recipient:scheduledAt`)
+- BullMQ job IDs match email IDs for uniqueness
+
+### Rate Limiting
+
+- **Atomic Lua script** in Redis checks and increments per-sender hourly counters
+- Fixed 1-hour window keys: `email-rate:{senderId}:{year}-{month}-{day}-{hour}`
+- When limit is reached, jobs are **rescheduled** to the next window (never dropped)
+- Safe across multiple concurrent workers
+
+### Per-Sender Throttling
+
+- Redis `SET key value PX delay NX` lock per sender
+- Minimum delay enforced between consecutive sends from the same sender
+- Concurrent workers for the same sender are coordinated via this lock
+
+### Multiple Senders
+
+Each sender has independent:
+- Email identity and display name
+- Hourly rate limit
+- Optional SMTP configuration
+- Throttle lock
+
+### Ethereal SMTP
+
+- Real email sending via Nodemailer + Ethereal
+- Auto-generates test accounts when no SMTP credentials configured
+- Captures preview URLs viewable at `ethereal.email`
+- SMTP credentials never exposed to frontend
+
+### User Isolation
+
+- All email queries filter by authenticated user's `userId` via campaign relation
+- `getEmailById` verifies campaign ownership before returning data
+
+---
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NODE_ENV` | `development` | Environment mode |
+| `PORT` | `5001` | Backend API port |
+| `DATABASE_URL` | — | PostgreSQL connection string |
+| `REDIS_URL` | `redis://localhost:6379` | Redis connection string |
+| `GOOGLE_CLIENT_ID` | — | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | — | Google OAuth client secret |
+| `JWT_SECRET` | — | JWT signing secret |
+| `WORKER_CONCURRENCY` | `5` | Max concurrent worker jobs |
+| `MIN_EMAIL_DELAY_MS` | `2000` | Minimum delay between sends per sender |
+| `MAX_EMAILS_PER_HOUR_PER_SENDER` | `200` | Default hourly rate limit per sender |
+| `ETHEREAL_HOST` | `smtp.ethereal.email` | SMTP host |
+| `ETHEREAL_PORT` | `587` | SMTP port |
+| `FRONTEND_URL` | `http://localhost:3000` | CORS allowed origin |
+
+---
+
+## Testing
+
+### Backend Tests (Jest)
 
 ```bash
 cd backend
 npm test
 ```
 
-### Critical Restart Test
-
-Tests scheduling a future email, stopping/restarting worker process, and verifying execution at the intended time:
-
-```bash
-node scripts/restart_test.js
-```
-
-### Low Hourly Rate Limit Rescheduling Test
-
-Configures a sender with a limit of 3 emails/hour, schedules 7 emails, and verifies that exactly 3 send immediately while the remaining 4 are delayed into the next window:
+### Rate Limit Test
 
 ```bash
 node scripts/rate_limit_test.js
 ```
 
----
+Configures a sender with limit=3/hr, schedules 7 emails, verifies exactly 3 send immediately while remaining 4 are rescheduled.
 
-## 📑 API Endpoint Reference
+### Restart Recovery Test
 
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `GET` | `/api/health` | System health check |
-| `GET` | `/api/auth/google/url` | Get Google OAuth consent URL |
-| `POST` | `/api/auth/google/callback` | Exchange OAuth code / ID Token for JWT |
-| `POST` | `/api/auth/dev-login` | Instant dev mode user login |
-| `GET` | `/api/senders` | List active sender profiles |
-| `POST` | `/api/senders` | Register new sender identity with hourly limit |
-| `POST` | `/api/emails/schedule` | Schedule email campaign batch |
-| `GET` | `/api/emails/scheduled` | List scheduled & queued emails |
-| `GET` | `/api/emails/sent` | List delivered & failed emails with Ethereal links |
-| `GET` | `/api/emails/:id` | Get single email status details |
+```bash
+node scripts/restart_test.js
+```
+
+Schedules a future email, kills and respawns the worker, verifies the email executes after restart.
 
 ---
 
-## ⚖️ Architectural Trade-Offs & Decisions
+## Design System
 
-1. **Relational Database as Source of Truth**: BullMQ job payloads contain only `{ emailId }` rather than full email state. The worker loads fresh state from PostgreSQL prior to execution, avoiding stale payload data.
-2. **State Transition Before SMTP Dispatch**: Transitioning status `SCHEDULED -> PROCESSING` in DB before sending prevents concurrent workers from picking up the same email twice. If Nodemailer fails, the status moves to `FAILED` or `SCHEDULED` for retry.
-3. **Rescheduling Over Dropping**: Reaching rate limits triggers automatic calculation of the top of the next hour window (`nextWindowStart`). The worker updates `scheduledAt` in DB and re-enqueues a delayed job in BullMQ rather than permanently failing the job.
+The frontend follows a **blueprint/architectural** aesthetic per `DESIGN.md`:
+
+- **Paper canvas** `#F3ECE5` background
+- **Ink** `#1F2736` typography and borders
+- **Neo-brutalist** 3px solid borders with offset box-shadows
+- **Drafting grid** background pattern
+- **Libre Bodoni** serif display headings
+- **Manrope** monospace body/labels
+
+---
+
+## Trade-offs
+
+1. **SMTP + DB is not a true distributed transaction**: If SMTP succeeds but the process crashes before updating the DB to `SENT`, the email may be retried. The atomic state claim (`SCHEDULED → PROCESSING`) limits this window, and BullMQ retries provide eventual consistency. In production, consider an outbox pattern or transactional email queue.
+
+2. **Dev login in development**: The `/api/auth/dev-login` endpoint is available for quick testing without Google OAuth setup. It is disabled in production mode.
+
+3. **JWT-based sessions**: Stateless JWT tokens with 7-day expiry. No server-side session store. Logout clears the client token.
+
+4. **Recovery is idempotent**: Running recovery multiple times produces the same result. Stuck `PROCESSING` emails are reset to `SCHEDULED` and re-enqueued.
+
+---
+
+## Project Structure
+
+```
+├── backend/
+│   ├── src/
+│   │   ├── config/         # Environment configuration
+│   │   ├── controllers/    # Route handlers (auth, email, sender)
+│   │   ├── db/             # Prisma & Redis clients
+│   │   ├── middleware/     # Auth JWT, error handler
+│   │   ├── queues/         # BullMQ queue definition
+│   │   ├── routes/         # Express router
+│   │   ├── services/       # Business logic (scheduling, SMTP, rate limiter, recovery)
+│   │   ├── utils/          # CSV parser
+│   │   ├── workers/        # BullMQ worker
+│   │   ├── __tests__/      # Jest test suites
+│   │   ├── server.ts       # Express app entry
+│   │   └── worker.ts       # Worker process entry
+│   └── prisma/
+│       └── schema.prisma   # Database schema
+├── frontend/
+│   ├── app/                # Next.js pages (layout, page, auth callback)
+│   ├── components/         # React components (Header, ComposeModal, SendersModal, tables)
+│   ├── services/           # API client layer
+│   └── utils/              # Client-side CSV parser
+├── scripts/                # Manual test scripts (restart, rate limit)
+├── docker-compose.yml      # PostgreSQL + Redis
+├── DESIGN.md               # Design system specification
+└── README.md               # This file
+```

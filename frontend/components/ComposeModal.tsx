@@ -1,14 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Sender, emailService } from '../services/api';
+import React, { useState, useRef } from 'react';
+import { Sender, emailService, ScheduleResponse } from '../services/api';
+import { parseLeadFileContent } from '../utils/csvParser';
 import { Upload, X, CheckCircle2, AlertTriangle, Clock, Zap, Mail, FileText } from 'lucide-react';
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_RECIPIENTS = 5000;
 
 interface ComposeModalProps {
   isOpen: boolean;
   onClose: () => void;
   senders: Sender[];
-  onSuccess: () => void;
+  onSuccess: (result: ScheduleResponse) => void;
 }
 
 export const ComposeModal: React.FC<ComposeModalProps> = ({
@@ -28,10 +32,10 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
-  // Real-time recipient detection and validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const rawList = leadText
     .split(/[\n,;]+/)
@@ -57,14 +61,29 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (file.size > MAX_FILE_SIZE) {
+      setErrorMsg(`File too large (${Math.round(file.size / 1024 / 1024)}MB). Maximum is 5MB.`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
       if (text) {
-        setLeadText((prev) => (prev ? `${prev}\n${text}` : text));
+        const parsed = parseLeadFileContent(text);
+        setLeadText((prev) => {
+          const combined = prev ? `${prev}\n${parsed.validEmails.join('\n')}` : parsed.validEmails.join('\n');
+          return combined;
+        });
+        if (parsed.invalidLines.length > 0) {
+          setErrorMsg(`Skipped ${parsed.invalidLines.length} invalid row(s) from file.`);
+          setTimeout(() => setErrorMsg(null), 4000);
+        }
       }
     };
     reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -75,7 +94,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
     const activeSenderId = selectedSenderId || senders[0]?.id;
 
     if (!activeSenderId) {
-      setErrorMsg('No sender account selected.');
+      setErrorMsg('No sender account available. Create a sender first.');
       return;
     }
     if (!subject.trim()) {
@@ -87,14 +106,26 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
       return;
     }
     if (validRecipients.length === 0) {
-      setErrorMsg('Please upload a valid CSV or enter at least one valid recipient email.');
+      setErrorMsg('Please upload a valid CSV/TXT or enter at least one valid recipient email.');
+      return;
+    }
+    if (validRecipients.length > MAX_RECIPIENTS) {
+      setErrorMsg(`Too many recipients (${validRecipients.length}). Maximum is ${MAX_RECIPIENTS}.`);
+      return;
+    }
+    if (delaySeconds < 1) {
+      setErrorMsg('Minimum delay is 1 second.');
+      return;
+    }
+    if (hourlyLimit < 1) {
+      setErrorMsg('Hourly limit must be at least 1.');
       return;
     }
 
     setLoading(true);
 
     try {
-      await emailService.scheduleEmails({
+      const result = await emailService.scheduleEmails({
         senderId: activeSenderId,
         subject: subject.trim(),
         body: body.trim(),
@@ -104,16 +135,28 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
         hourlyLimit,
       });
 
-      setSuccessMsg(`Successfully scheduled campaign with ${validRecipients.length} recipients!`);
+      setSuccessMsg(`Campaign scheduled: ${result.data.scheduledEmails} emails queued.`);
       setTimeout(() => {
-        onSuccess();
+        onSuccess(result);
         onClose();
-      }, 1200);
+        resetForm();
+      }, 1500);
     } catch (err: any) {
       setErrorMsg(err.response?.data?.error || err.message || 'Failed to schedule campaign');
     } finally {
       setLoading(false);
     }
+  };
+
+  const resetForm = () => {
+    setSubject('');
+    setBody('');
+    setLeadText('');
+    setStartTime('');
+    setDelaySeconds(2);
+    setHourlyLimit(200);
+    setErrorMsg(null);
+    setSuccessMsg(null);
   };
 
   return (
@@ -135,7 +178,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
             </p>
           </div>
           <button
-            onClick={onClose}
+            onClick={() => { resetForm(); onClose(); }}
             className="p-2 bg-[#1F2736] text-white hover:bg-[#D63A35] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -157,7 +200,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Sender & Start Time Grid */}
+          {/* Sender & Start Time */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-mono font-bold uppercase text-[#1F2736] mb-1.5">
@@ -170,7 +213,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
               >
                 {senders.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.displayName} ({s.email}) — Limit: {s.hourlyLimit}/hr
+                    {s.displayName} ({s.email}) — {s.hourlyLimit}/hr
                   </option>
                 ))}
               </select>
@@ -178,7 +221,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
 
             <div>
               <label className="block text-xs font-mono font-bold uppercase text-[#1F2736] mb-1.5 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" /> START TIME (OPTIONAL — DEFAULT IMMEDIATE)
+                <Clock className="w-3.5 h-3.5" /> START TIME (OPTIONAL)
               </label>
               <input
                 type="datetime-local"
@@ -189,9 +232,9 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
             </div>
           </div>
 
-          {/* Subject & Throttling Parameters */}
+          {/* Throttling */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="md:col-span-1">
+            <div>
               <label className="block text-xs font-mono font-bold uppercase text-[#1F2736] mb-1.5 flex items-center gap-1">
                 <Zap className="w-3.5 h-3.5" /> MIN DELAY (SEC)
               </label>
@@ -205,9 +248,9 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
               />
             </div>
 
-            <div className="md:col-span-1">
+            <div>
               <label className="block text-xs font-mono font-bold uppercase text-[#1F2736] mb-1.5">
-                HOURLY LIMIT (MAX / HR)
+                HOURLY LIMIT
               </label>
               <input
                 type="number"
@@ -219,14 +262,14 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
               />
             </div>
 
-            <div className="md:col-span-1 flex items-end">
+            <div className="flex items-end">
               <div className="bg-[#E8DDD3] p-2.5 border-2 border-[#1F2736] w-full text-xs font-mono text-[#445166]">
-                Per-Sender Rate Limiting backed by Redis INCR.
+                Per-sender. Redis-backed. Jobs rescheduled when limit hit.
               </div>
             </div>
           </div>
 
-          {/* Email Subject */}
+          {/* Subject */}
           <div>
             <label className="block text-xs font-mono font-bold uppercase text-[#1F2736] mb-1.5">
               EMAIL SUBJECT *
@@ -240,16 +283,16 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
             />
           </div>
 
-          {/* Lead List File Upload & Recipient Parsing */}
+          {/* Recipients / CSV Upload */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-mono font-bold uppercase text-[#1F2736] flex items-center gap-1.5">
-                <FileText className="w-4 h-4 text-[#D63A35]" /> RECIPIENTS / LEAD FILE (CSV OR TEXT)
+                <FileText className="w-4 h-4 text-[#D63A35]" /> RECIPIENTS / LEAD FILE (CSV OR TXT)
               </label>
-
               <label className="cursor-pointer bg-[#1F2736] text-[#F3ECE5] hover:bg-[#D63A35] transition-colors text-xs font-mono font-bold px-3 py-1 border-blueprint-sm flex items-center gap-1.5">
-                <Upload className="w-3.5 h-3.5" /> UPLOAD CSV / TXT
+                <Upload className="w-3.5 h-3.5" /> UPLOAD FILE
                 <input
+                  ref={fileInputRef}
                   type="file"
                   accept=".csv,.txt"
                   onChange={handleFileUpload}
@@ -260,67 +303,66 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
 
             <textarea
               rows={4}
-              placeholder="Paste email addresses here (one per line or comma separated), or upload a CSV file above..."
+              placeholder="Paste emails here (one per line or comma-separated), or upload a CSV/TXT file above..."
               value={leadText}
               onChange={(e) => setLeadText(e.target.value)}
               className="w-full bg-[#F3ECE5] border-2 border-[#1F2736] p-3 font-mono text-sm focus:outline-none focus:border-[#D63A35]"
             />
 
-            {/* Recipient Validation Breakdown Pill */}
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2 p-2.5 bg-[#E8DDD3] border-2 border-[#1F2736] font-mono text-xs">
               <div className="flex items-center gap-4">
                 <span className="font-bold text-[#1F2736]">
-                  TOTAL DETECTED: <span className="bg-[#1F2736] text-white px-1.5 py-0.5">{rawList.length}</span>
+                  DETECTED: <span className="bg-[#1F2736] text-white px-1.5 py-0.5">{rawList.length}</span>
                 </span>
                 <span className="font-bold text-emerald-700">
-                  VALID UNIQUE: <span className="bg-emerald-700 text-white px-1.5 py-0.5">{validRecipients.length}</span>
+                  VALID: <span className="bg-emerald-700 text-white px-1.5 py-0.5">{validRecipients.length}</span>
                 </span>
                 {invalidRecipients.length > 0 && (
                   <span className="font-bold text-[#D63A35]">
-                    INVALID ROWS: <span className="bg-[#D63A35] text-white px-1.5 py-0.5">{invalidRecipients.length}</span>
+                    INVALID: <span className="bg-[#D63A35] text-white px-1.5 py-0.5">{invalidRecipients.length}</span>
                   </span>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Email Body */}
+          {/* Body */}
           <div>
             <label className="block text-xs font-mono font-bold uppercase text-[#1F2736] mb-1.5">
               EMAIL BODY CONTENT *
             </label>
             <textarea
               rows={5}
-              placeholder="Hi {{name}},\n\nWe noticed your team is building email infrastructure..."
+              placeholder="Hi there,&#10;&#10;We noticed your team is building..."
               value={body}
               onChange={(e) => setBody(e.target.value)}
               className="w-full bg-[#F3ECE5] border-2 border-[#1F2736] p-3 font-mono text-sm focus:outline-none focus:border-[#D63A35]"
             />
           </div>
 
-          {/* Form Actions */}
+          {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t-2 border-[#1F2736]">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => { resetForm(); onClose(); }}
               className="px-5 py-2.5 bg-[#E8DDD3] text-[#1F2736] font-mono font-bold text-xs border-blueprint-interactive cursor-pointer"
             >
               CANCEL
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="px-6 py-2.5 bg-[#D63A35] text-white font-mono font-bold text-xs border-blueprint-interactive flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              disabled={loading || validRecipients.length === 0}
+              className="px-6 py-2.5 bg-[#D63A35] text-white font-mono font-bold text-xs border-blueprint-interactive flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white border-t-transparent animate-spin" />
-                  SCHEDULING JOBS...
+                  SCHEDULING...
                 </>
               ) : (
                 <>
                   <Mail className="w-4 h-4" />
-                  SCHEDULE {validRecipients.length} EMAILS
+                  SCHEDULE {validRecipients.length} EMAIL{validRecipients.length !== 1 ? 'S' : ''}
                 </>
               )}
             </button>
