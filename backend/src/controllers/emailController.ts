@@ -8,10 +8,10 @@ const scheduleEmailsSchema = z.object({
   senderId: z.string().min(1, 'senderId is required'),
   subject: z.string().min(1, 'Subject is required').max(200),
   body: z.string().min(1, 'Body is required'),
-  recipients: z.array(z.string()).min(1, 'At least one recipient is required'),
-  startTime: z.string().optional(),
-  delayBetweenEmailsMs: z.coerce.number().int().positive().optional(),
-  hourlyLimit: z.coerce.number().int().positive().optional(),
+  recipients: z.array(z.string().min(1)).min(1, 'At least one recipient is required').max(5000, 'Maximum 5000 recipients per campaign'),
+  startTime: z.string().datetime({ message: 'startTime must be a valid ISO 8601 datetime' }).optional(),
+  delayBetweenEmailsMs: z.coerce.number().int().positive().max(3600000, 'Maximum delay is 1 hour').optional(),
+  hourlyLimit: z.coerce.number().int().positive().max(10000).optional(),
 });
 
 const createSenderSchema = z.object({
@@ -77,8 +77,8 @@ export class EmailController {
         return;
       }
 
-      const page = parseInt(req.query.page as string || '1', 10);
-      const limit = parseInt(req.query.limit as string || '50', 10);
+      const page = Math.max(1, parseInt(req.query.page as string || '1', 10) || 1);
+      const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string || '50', 10) || 50));
       const skip = (page - 1) * limit;
 
       const scheduledStatuses = ['SCHEDULED', 'PROCESSING'];
@@ -121,8 +121,8 @@ export class EmailController {
         return;
       }
 
-      const page = parseInt(req.query.page as string || '1', 10);
-      const limit = parseInt(req.query.limit as string || '50', 10);
+      const page = Math.max(1, parseInt(req.query.page as string || '1', 10) || 1);
+      const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string || '50', 10) || 50));
       const skip = (page - 1) * limit;
 
       const sentStatuses = ['SENT', 'FAILED'];

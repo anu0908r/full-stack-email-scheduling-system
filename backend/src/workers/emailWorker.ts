@@ -30,6 +30,16 @@ export const createEmailWorker = () => {
         return;
       }
 
+      // 2b. Crash recovery guard: if email has etherealMessageId, it was sent but status wasn't updated
+      if (email.etherealMessageId) {
+        console.log(`[Worker] Email ${emailId} already has SMTP receipt (${email.etherealMessageId}). Marking SENT.`);
+        await prisma.email.update({
+          where: { id: emailId },
+          data: { status: 'SENT', sentAt: email.sentAt || new Date() },
+        });
+        return;
+      }
+
       // 3. Atomic State Claim (Concurrency & Race Condition Guard)
       const claimResult = await prisma.email.updateMany({
         where: {

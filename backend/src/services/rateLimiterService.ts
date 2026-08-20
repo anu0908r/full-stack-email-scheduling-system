@@ -6,8 +6,8 @@ export class RateLimiterService {
    */
   private static getHourWindowKey(senderId: string, timestampMs: number = Date.now()): { key: string; windowStart: Date; nextWindowStart: Date } {
     const date = new Date(timestampMs);
-    date.setMinutes(0, 0, 0); // floor to top of hour
-    const windowStartMs = date.getTime();
+    // Floor to the top of the current UTC hour for consistent key generation
+    const windowStartMs = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), date.getUTCHours(), 0, 0, 0);
     const nextWindowStartMs = windowStartMs + 60 * 60 * 1000;
 
     const formattedHour = `${date.getUTCFullYear()}-${date.getUTCMonth() + 1}-${date.getUTCDate()}-${date.getUTCHours()}`;

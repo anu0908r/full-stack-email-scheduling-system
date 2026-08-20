@@ -2,6 +2,8 @@ import { prisma } from '../db/prisma';
 import { emailQueue, addEmailToQueue } from '../queues/emailQueue';
 
 export class RecoveryService {
+  private static MAX_RECOVERY_ATTEMPTS = 5;
+
   /**
    * Reconciles orphaned and unqueued jobs on worker/server startup.
    *
@@ -10,13 +12,12 @@ export class RecoveryService {
    * Case C: DB=PROCESSING, BullMQ exists → do not duplicate (reset to SCHEDULED, let BullMQ reprocess)
    * Case D: DB=PROCESSING, BullMQ missing → reset to SCHEDULED, recreate
    * Case E: DB=SENT → never recreate
-   * Case F: DB=FAILED → leave as-is (BullMQ retry strategy handles it)
+   * Case F: DB=FAILED, attempts < MAX → reset to SCHEDULED, recreate (BullMQ may have given up)
    */
-  public static async reconcileScheduledJobs(): Promise<{ resetProcessing: number; requeuedJobs: number }> {
+  public static async reconcileScheduledJobs(): Promise<{ resetProcessing: number; requeuedJobs: number; resetFailed: number }> {
     console.log('[RecoveryService] Running startup reconciliation check...');
 
     // 1. Reset any emails stuck in PROCESSING back to SCHEDULED
-    // These were likely interrupted by a crash/restart
     const stuckResult = await prisma.email.updateMany({
       where: {
         status: 'PROCESSING',
@@ -30,7 +31,22 @@ export class RecoveryService {
       console.log(`[RecoveryService] Reset ${stuckResult.count} stuck PROCESSING emails to SCHEDULED.`);
     }
 
-    // 2. Fetch all SCHEDULED emails (fresh after reset)
+    // 2. Requeue FAILED emails that haven't exceeded max recovery attempts
+    const failedResult = await prisma.email.updateMany({
+      where: {
+        status: 'FAILED',
+        attempts: { lt: this.MAX_RECOVERY_ATTEMPTS },
+      },
+      data: {
+        status: 'SCHEDULED',
+      },
+    });
+
+    if (failedResult.count > 0) {
+      console.log(`[RecoveryService] Reset ${failedResult.count} FAILED emails to SCHEDULED for retry.`);
+    }
+
+    // 3. Fetch all SCHEDULED emails (fresh after reset)
     const scheduledEmails = await prisma.email.findMany({
       where: {
         status: 'SCHEDULED',
@@ -60,11 +76,12 @@ export class RecoveryService {
       }
     }
 
-    console.log(`[RecoveryService] Reconciliation completed. Reset: ${stuckResult.count}, Requeued: ${requeuedCount}.`);
+    console.log(`[RecoveryService] Reconciliation completed. Reset: ${stuckResult.count}, FailedReset: ${failedResult.count}, Requeued: ${requeuedCount}.`);
 
     return {
       resetProcessing: stuckResult.count,
       requeuedJobs: requeuedCount,
+      resetFailed: failedResult.count,
     };
   }
 }

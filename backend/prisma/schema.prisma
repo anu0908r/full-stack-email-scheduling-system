@@ -16,11 +16,14 @@ model User {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   campaigns Campaign[]
+  senders   Sender[]
 }
 
 model Sender {
   id          String   @id @default(uuid())
-  email       String   @unique
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email       String
   displayName String
   smtpHost    String?
   smtpPort    Int?
@@ -30,6 +33,9 @@ model Sender {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   emails      Email[]
+
+  @@unique([userId, email])
+  @@index([userId])
 }
 
 model Campaign {
