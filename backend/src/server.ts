@@ -5,6 +5,8 @@ import routes from './routes';
 import { errorHandler } from './middleware/errorHandler';
 import { prisma } from './db/prisma';
 import { redisConnection } from './db/redis';
+import { createEmailWorker } from './workers/emailWorker';
+import { RecoveryService } from './services/recoveryService';
 
 const app = express();
 
@@ -23,23 +25,32 @@ app.use(errorHandler);
 const PORT = config.port;
 
 if (process.env.NODE_ENV !== 'test') {
-  const server = app.listen(PORT, () => {
+  const server = app.listen(PORT, async () => {
     console.log(`[Express API Server] Running on http://localhost:${PORT}`);
+
+    try {
+      await RecoveryService.reconcileScheduledJobs();
+    } catch (err: any) {
+      console.error('[Worker Startup Recovery Error]', err.message);
+    }
+
+    const worker = createEmailWorker();
+    console.log('[BullMQ Worker] Initialized and listening for jobs.');
+
+    const shutdown = async (signal: string) => {
+      console.log(`[Server] ${signal} received. Shutting down gracefully...`);
+      server.close(async () => {
+        await worker.close();
+        await prisma.$disconnect();
+        redisConnection.disconnect();
+        process.exit(0);
+      });
+      setTimeout(() => process.exit(1), 10000);
+    };
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
   });
-
-  const shutdown = async (signal: string) => {
-    console.log(`[API Server] ${signal} received. Shutting down gracefully...`);
-    server.close(async () => {
-      await prisma.$disconnect();
-      redisConnection.disconnect();
-      process.exit(0);
-    });
-    // Force exit after 10s
-    setTimeout(() => process.exit(1), 10000);
-  };
-
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 export default app;
