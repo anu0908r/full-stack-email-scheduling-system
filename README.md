@@ -4,6 +4,39 @@ A production-grade, full-stack email scheduling system built with **Node.js, Exp
 
 ---
 
+## Features
+
+- **Email Scheduling** — Schedule campaigns with configurable delay between emails and send-after delay
+- **BullMQ Delayed Jobs** — No cron, all scheduling uses Redis-persisted delayed jobs
+- **Per-Sender Throttling** — Minimum delay between consecutive sends from the same sender
+- **Hourly Rate Limiting** — Atomic Lua script rate limiter with intelligent rescheduling
+- **Server Restart Recovery** — Worker startup reconciliation recovers stuck/missing jobs
+- **Idempotent Processing** — Atomic state claims prevent duplicate sends
+- **Google OAuth** — Secure authentication with Google accounts
+- **Ethereal SMTP** — Real email sending with preview URLs for testing
+- **CSV Upload** — Bulk import recipients from CSV/TXT files
+- **Dashboard** — Real-time view of Scheduled and Sent emails with animated transitions
+- **Multiple Senders** — Independent rate limits and SMTP config per sender
+
+---
+
+## Demo
+
+### Quick Start
+1. Start PostgreSQL and Redis
+2. Run `cd backend && npm install && npx prisma db push && npm run dev`
+3. Run `cd backend && npm run worker` (in separate terminal)
+4. Run `cd frontend && npm install --legacy-peer-deps && npm run dev`
+5. Open http://localhost:3000 and sign in with Google
+
+### What to Demo
+1. **Schedule emails** — Add sender, compose campaign, set "Send After" delay
+2. **Dashboard** — Watch emails move from Scheduled to Sent tab
+3. **Restart recovery** — Kill worker, restart, emails still process
+4. **Rate limiting** — Schedule 7+ emails with limit=3/hr, watch rescheduling
+
+---
+
 ## Architecture
 
 ```
