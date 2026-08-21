@@ -71,8 +71,7 @@ export const createEmailWorker = () => {
           data: { status: 'SCHEDULED' },
         });
 
-        // Re-add job to BullMQ with delay
-        await addEmailToQueue(emailId, throttleCheck.retryAfterMs);
+        await addEmailToQueue(emailId, throttleCheck.retryAfterMs, `${emailId}-${Date.now()}`);
         return;
       }
 
@@ -97,8 +96,7 @@ export const createEmailWorker = () => {
           },
         });
 
-        // Re-enqueue delayed job for next window
-        await addEmailToQueue(emailId, delayUntilNextWindow);
+        await addEmailToQueue(emailId, delayUntilNextWindow, `${emailId}-${Date.now()}`);
         return;
       }
 

@@ -5,7 +5,7 @@ import { Sender, emailService, ScheduleResponse } from '../services/api';
 import { parseLeadFileContent } from '../utils/csvParser';
 import { Upload, X, CheckCircle2, AlertTriangle, Clock, Zap, Mail, FileText } from 'lucide-react';
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const MAX_RECIPIENTS = 5000;
 
 interface ComposeModalProps {
@@ -37,10 +37,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
   if (!isOpen) return null;
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const rawList = leadText
-    .split(/[\n,;]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const rawList = leadText.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
 
   const validRecipientsSet = new Set<string>();
   const invalidRecipientsSet = new Set<string>();
@@ -160,209 +157,108 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#1F2736]/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-[#F7F1EB] border-blueprint w-full max-w-3xl my-8 relative p-6 md:p-8">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b-4 border-[#1F2736] pb-4 mb-6">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-2xl font-bold font-serif-display text-[#1F2736]">
-                COMPOSE & SCHEDULE CAMPAIGN
-              </h2>
-              <span className="bg-[#D63A35] text-white text-[10px] font-mono px-2 py-0.5 uppercase">
-                BULLMQ DELAYED
-              </span>
-            </div>
-            <p className="text-xs font-mono text-[#445166] mt-0.5">
-              Configure batch parameters, lead lists, and per-sender throttling.
-            </p>
-          </div>
-          <button
-            onClick={() => { resetForm(); onClose(); }}
-            className="p-2 bg-[#1F2736] text-white hover:bg-[#D63A35] transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
+    <div className="modal-backdrop" onClick={() => { resetForm(); onClose(); }}>
+      <div className="modal-content p-6 md:p-8" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-6">
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>Compose & Schedule</h2>
+          <button onClick={() => { resetForm(); onClose(); }} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--text-muted)' }}>
+            <X size={20} />
           </button>
         </div>
 
         {errorMsg && (
-          <div className="mb-6 p-4 bg-[#E86A65]/20 border-2 border-[#D63A35] text-[#D63A35] text-sm font-mono flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 shrink-0" />
-            <span>{errorMsg}</span>
+          <div className="flex items-center gap-2 p-3 rounded-lg text-sm mb-4" style={{ background: 'var(--danger-light)', color: '#991b1b' }}>
+            <AlertTriangle size={16} />
+            {errorMsg}
           </div>
         )}
 
         {successMsg && (
-          <div className="mb-6 p-4 bg-emerald-100 border-2 border-emerald-600 text-emerald-800 text-sm font-mono flex items-center gap-3">
-            <CheckCircle2 className="w-5 h-5 shrink-0" />
-            <span>{successMsg}</span>
+          <div className="flex items-center gap-2 p-3 rounded-lg text-sm mb-4" style={{ background: 'var(--success-light)', color: '#166534' }}>
+            <CheckCircle2 size={16} />
+            {successMsg}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Sender & Start Time */}
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-mono font-bold uppercase text-[#1F2736] mb-1.5">
-                SELECT SENDER ACCOUNT *
-              </label>
-              <select
-                value={selectedSenderId}
-                onChange={(e) => setSelectedSenderId(e.target.value)}
-                className="w-full bg-[#F3ECE5] border-2 border-[#1F2736] p-2.5 font-mono text-sm focus:outline-none focus:border-[#D63A35]"
-              >
+              <label className="label">Sender Account</label>
+              <select value={selectedSenderId} onChange={(e) => setSelectedSenderId(e.target.value)} className="input-field">
                 {senders.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.displayName} ({s.email}) — {s.hourlyLimit}/hr
-                  </option>
+                  <option key={s.id} value={s.id}>{s.displayName} ({s.email})</option>
                 ))}
               </select>
             </div>
-
             <div>
-              <label className="block text-xs font-mono font-bold uppercase text-[#1F2736] mb-1.5 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" /> START TIME (OPTIONAL)
-              </label>
-              <input
-                type="datetime-local"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="w-full bg-[#F3ECE5] border-2 border-[#1F2736] p-2 font-mono text-sm focus:outline-none focus:border-[#D63A35]"
-              />
+              <label className="label">Start Time (Optional)</label>
+              <input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="input-field" />
             </div>
           </div>
 
-          {/* Throttling */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-mono font-bold uppercase text-[#1F2736] mb-1.5 flex items-center gap-1">
-                <Zap className="w-3.5 h-3.5" /> MIN DELAY (SEC)
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="3600"
-                value={delaySeconds}
-                onChange={(e) => setDelaySeconds(parseInt(e.target.value, 10) || 1)}
-                className="w-full bg-[#F3ECE5] border-2 border-[#1F2736] p-2.5 font-mono text-sm focus:outline-none focus:border-[#D63A35]"
-              />
+              <label className="label">Delay Between Emails (seconds)</label>
+              <input type="number" min="1" max="3600" value={delaySeconds} onChange={(e) => setDelaySeconds(parseInt(e.target.value, 10) || 1)} className="input-field" />
             </div>
-
             <div>
-              <label className="block text-xs font-mono font-bold uppercase text-[#1F2736] mb-1.5">
-                HOURLY LIMIT
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="10000"
-                value={hourlyLimit}
-                onChange={(e) => setHourlyLimit(parseInt(e.target.value, 10) || 200)}
-                className="w-full bg-[#F3ECE5] border-2 border-[#1F2736] p-2.5 font-mono text-sm focus:outline-none focus:border-[#D63A35]"
-              />
-            </div>
-
-            <div className="flex items-end">
-              <div className="bg-[#E8DDD3] p-2.5 border-2 border-[#1F2736] w-full text-xs font-mono text-[#445166]">
-                Per-sender. Redis-backed. Jobs rescheduled when limit hit.
-              </div>
+              <label className="label">Hourly Limit</label>
+              <input type="number" min="1" max="10000" value={hourlyLimit} onChange={(e) => setHourlyLimit(parseInt(e.target.value, 10) || 200)} className="input-field" />
             </div>
           </div>
 
-          {/* Subject */}
           <div>
-            <label className="block text-xs font-mono font-bold uppercase text-[#1F2736] mb-1.5">
-              EMAIL SUBJECT *
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. Scaling your outreach pipeline with AI"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="w-full bg-[#F3ECE5] border-2 border-[#1F2736] p-2.5 font-mono text-sm focus:outline-none focus:border-[#D63A35]"
-            />
+            <label className="label">Subject</label>
+            <input type="text" placeholder="e.g. Scaling your outreach pipeline" value={subject} onChange={(e) => setSubject(e.target.value)} className="input-field" />
           </div>
 
-          {/* Recipients / CSV Upload */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-mono font-bold uppercase text-[#1F2736] flex items-center gap-1.5">
-                <FileText className="w-4 h-4 text-[#D63A35]" /> RECIPIENTS / LEAD FILE (CSV OR TXT)
-              </label>
-              <label className="cursor-pointer bg-[#1F2736] text-[#F3ECE5] hover:bg-[#D63A35] transition-colors text-xs font-mono font-bold px-3 py-1 border-blueprint-sm flex items-center gap-1.5">
-                <Upload className="w-3.5 h-3.5" /> UPLOAD FILE
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv,.txt"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
+              <label className="label" style={{ marginBottom: 0 }}>Recipients (CSV/TXT)</label>
+              <label className="cursor-pointer flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors" style={{ color: 'var(--accent)', border: '1px solid var(--border)' }}>
+                <Upload size={14} />
+                Upload file
+                <input ref={fileInputRef} type="file" accept=".csv,.txt" onChange={handleFileUpload} className="hidden" />
               </label>
             </div>
+            <textarea rows={3} placeholder="Paste emails (one per line, comma, or semicolon separated)..." value={leadText} onChange={(e) => setLeadText(e.target.value)} className="input-field" style={{ fontFamily: 'monospace', fontSize: 13 }} />
 
-            <textarea
-              rows={4}
-              placeholder="Paste emails here (one per line or comma-separated), or upload a CSV/TXT file above..."
-              value={leadText}
-              onChange={(e) => setLeadText(e.target.value)}
-              className="w-full bg-[#F3ECE5] border-2 border-[#1F2736] p-3 font-mono text-sm focus:outline-none focus:border-[#D63A35]"
-            />
-
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 p-2.5 bg-[#E8DDD3] border-2 border-[#1F2736] font-mono text-xs">
-              <div className="flex items-center gap-4">
-                <span className="font-bold text-[#1F2736]">
-                  DETECTED: <span className="bg-[#1F2736] text-white px-1.5 py-0.5">{rawList.length}</span>
+            {rawList.length > 0 && (
+              <div className="flex items-center gap-4 mt-2 text-xs">
+                <span style={{ color: 'var(--text-secondary)' }}>
+                  Detected: <strong>{rawList.length}</strong>
                 </span>
-                <span className="font-bold text-emerald-700">
-                  VALID: <span className="bg-emerald-700 text-white px-1.5 py-0.5">{validRecipients.length}</span>
+                <span style={{ color: 'var(--success)' }}>
+                  Valid: <strong>{validRecipients.length}</strong>
                 </span>
                 {invalidRecipients.length > 0 && (
-                  <span className="font-bold text-[#D63A35]">
-                    INVALID: <span className="bg-[#D63A35] text-white px-1.5 py-0.5">{invalidRecipients.length}</span>
+                  <span style={{ color: 'var(--danger)' }}>
+                    Invalid: <strong>{invalidRecipients.length}</strong>
                   </span>
                 )}
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Body */}
           <div>
-            <label className="block text-xs font-mono font-bold uppercase text-[#1F2736] mb-1.5">
-              EMAIL BODY CONTENT *
-            </label>
-            <textarea
-              rows={5}
-              placeholder="Hi there,&#10;&#10;We noticed your team is building..."
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              className="w-full bg-[#F3ECE5] border-2 border-[#1F2736] p-3 font-mono text-sm focus:outline-none focus:border-[#D63A35]"
-            />
+            <label className="label">Email Body</label>
+            <textarea rows={4} placeholder="Hi there,&#10;&#10;We noticed your team is building..." value={body} onChange={(e) => setBody(e.target.value)} className="input-field" style={{ fontFamily: 'monospace', fontSize: 13 }} />
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t-2 border-[#1F2736]">
-            <button
-              type="button"
-              onClick={() => { resetForm(); onClose(); }}
-              className="px-5 py-2.5 bg-[#E8DDD3] text-[#1F2736] font-mono font-bold text-xs border-blueprint-interactive cursor-pointer"
-            >
-              CANCEL
+          <div className="flex items-center justify-end gap-3 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+            <button type="button" onClick={() => { resetForm(); onClose(); }} className="btn-outline">
+              Cancel
             </button>
-            <button
-              type="submit"
-              disabled={loading || validRecipients.length === 0}
-              className="px-6 py-2.5 bg-[#D63A35] text-white font-mono font-bold text-xs border-blueprint-interactive flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <button type="submit" disabled={loading || validRecipients.length === 0} className="btn-primary flex items-center gap-2">
               {loading ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent animate-spin" />
-                  SCHEDULING...
+                  <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+                  Scheduling...
                 </>
               ) : (
                 <>
-                  <Mail className="w-4 h-4" />
-                  SCHEDULE {validRecipients.length} EMAIL{validRecipients.length !== 1 ? 'S' : ''}
+                  <Mail size={16} />
+                  Schedule {validRecipients.length} email{validRecipients.length !== 1 ? 's' : ''}
                 </>
               )}
             </button>
