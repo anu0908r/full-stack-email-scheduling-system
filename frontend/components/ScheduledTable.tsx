@@ -50,7 +50,7 @@ export const ScheduledTable: React.FC<ScheduledTableProps> = ({
                 <th className="px-5 py-3 font-semibold" style={{ color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="stagger-children">
               {emails.map((email) => {
                 const date = new Date(email.scheduledAt);
                 const isPast = date.getTime() <= Date.now();

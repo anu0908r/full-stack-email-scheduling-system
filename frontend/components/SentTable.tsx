@@ -51,7 +51,7 @@ export const SentTable: React.FC<SentTableProps> = ({
                 <th className="px-5 py-3 font-semibold" style={{ color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Preview</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="stagger-children">
               {emails.map((email) => (
                 <tr key={email.id} className="transition-colors" style={{ borderTop: '1px solid var(--border)' }}>
                   <td className="px-5 py-3.5 font-medium" style={{ color: 'var(--text-primary)' }}>{email.recipient}</td>

@@ -25,7 +25,7 @@ export default function DashboardPage() {
 
   const showToast = useCallback((type: 'success' | 'error', message: string) => {
     setToast({ type, message });
-    setTimeout(() => setToast(null), 4000);
+    setTimeout(() => setToast(null), 5000);
   }, []);
 
   const checkAuth = useCallback(async () => {
@@ -207,7 +207,7 @@ export default function DashboardPage() {
         onLogout={handleLogout}
       />
 
-      <main className="flex-1 ml-0 md:ml-64 p-4 md:p-8">
+      <main className="flex-1 ml-0 md:ml-64 p-4 md:p-8 animate-fade-in">
         <div className="max-w-6xl mx-auto">
           {activeTab === 'scheduled' ? (
             <ScheduledTable emails={scheduledEmails} loading={loadingScheduled} onRefresh={fetchScheduled} />
@@ -233,14 +233,20 @@ export default function DashboardPage() {
 
       {toast && (
         <div
-          className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg text-sm font-medium"
+          className="toast fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium shadow-lg"
           style={{
             background: toast.type === 'success' ? 'var(--success-light)' : 'var(--danger-light)',
             color: toast.type === 'success' ? '#166534' : '#991b1b',
             border: `1px solid ${toast.type === 'success' ? 'var(--success)' : 'var(--danger)'}`,
           }}
         >
-          {toast.message}
+          <span>{toast.message}</span>
+          <button
+            onClick={() => setToast(null)}
+            style={{ color: 'inherit', opacity: 0.6, cursor: 'pointer', background: 'none', border: 'none', padding: '0 0 0 8px', fontSize: 16, lineHeight: 1 }}
+          >
+            &times;
+          </button>
         </div>
       )}
     </div>

@@ -185,7 +185,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5 stagger-children">
           <div>
             <label className="label">Sender Account</label>
             <select value={selectedSenderId} onChange={(e) => setSelectedSenderId(e.target.value)} className="input-field">
@@ -193,6 +193,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
                 <option key={s.id} value={s.id}>{s.displayName} ({s.email})</option>
               ))}
             </select>
+          </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
