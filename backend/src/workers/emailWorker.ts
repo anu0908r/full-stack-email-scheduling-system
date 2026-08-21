@@ -40,11 +40,22 @@ export const createEmailWorker = () => {
         return;
       }
 
+      // 2c. Stuck PROCESSING recovery: if email is PROCESSING for > 2 minutes, reset to SCHEDULED
+      if (email.status === 'PROCESSING') {
+        const stuckDuration = Date.now() - new Date(email.updatedAt).getTime();
+        if (stuckDuration > 120000) {
+          console.log(`[Worker] Email ${emailId} stuck in PROCESSING for ${Math.round(stuckDuration / 1000)}s. Resetting to SCHEDULED.`);
+        } else {
+          console.log(`[Worker] Email ${emailId} is PROCESSING (${Math.round(stuckDuration / 1000)}s). Skipping.`);
+          return;
+        }
+      }
+
       // 3. Atomic State Claim (Concurrency & Race Condition Guard)
       const claimResult = await prisma.email.updateMany({
         where: {
           id: emailId,
-          status: { in: ['SCHEDULED', 'FAILED'] },
+          status: { in: ['SCHEDULED', 'FAILED', 'PROCESSING'] },
         },
         data: {
           status: 'PROCESSING',
@@ -100,9 +111,9 @@ export const createEmailWorker = () => {
         return;
       }
 
-      // 6. SMTP Email Delivery via Ethereal
+      // 6. SMTP Email Delivery via Ethereal with timeout
       try {
-        const smtpResult = await sendEmailViaSMTP({
+        const smtpPromise = sendEmailViaSMTP({
           senderEmail: email.sender.email,
           senderName: email.sender.displayName,
           recipient: email.recipient,
@@ -113,6 +124,12 @@ export const createEmailWorker = () => {
           smtpUser: email.sender.smtpUser,
           smtpPass: email.sender.smtpPass,
         });
+
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('SMTP timeout after 45s')), 45000)
+        );
+
+        const smtpResult = await Promise.race([smtpPromise, timeoutPromise]);
 
         // 7. Success State Persistence
         await prisma.email.update({
@@ -189,7 +206,10 @@ export const createEmailWorker = () => {
     },
     {
       connection: redisWorker,
-      concurrency: config.workerConcurrency,
+      concurrency: 1,
+      lockDuration: 60000,
+      stalledInterval: 30000,
+      maxStalledCount: 3,
     }
   );
 
