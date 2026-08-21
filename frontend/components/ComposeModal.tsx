@@ -25,7 +25,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
   const [subject, setSubject] = useState<string>('');
   const [body, setBody] = useState<string>('');
   const [leadText, setLeadText] = useState<string>('');
-  const [startTime, setStartTime] = useState<string>('');
+  const [sendAfterSeconds, setSendAfterSeconds] = useState<number>(60);
   const [delaySeconds, setDelaySeconds] = useState<number>(2);
   const [hourlyLimit, setHourlyLimit] = useState<number>(200);
 
@@ -111,7 +111,11 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
       return;
     }
     if (delaySeconds < 1) {
-      setErrorMsg('Minimum delay is 1 second.');
+      setErrorMsg('Minimum delay between emails is 1 second.');
+      return;
+    }
+    if (sendAfterSeconds < 0) {
+      setErrorMsg('Send after must be 0 or more seconds.');
       return;
     }
     if (hourlyLimit < 1) {
@@ -122,12 +126,13 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
     setLoading(true);
 
     try {
+      const computedStartTime = new Date(Date.now() + sendAfterSeconds * 1000).toISOString();
       const result = await emailService.scheduleEmails({
         senderId: activeSenderId,
         subject: subject.trim(),
         body: body.trim(),
         recipients: validRecipients,
-        startTime: startTime ? new Date(startTime).toISOString() : undefined,
+        startTime: computedStartTime,
         delayBetweenEmailsMs: delaySeconds * 1000,
         hourlyLimit,
       });
@@ -149,7 +154,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
     setSubject('');
     setBody('');
     setLeadText('');
-    setStartTime('');
+    setSendAfterSeconds(60);
     setDelaySeconds(2);
     setHourlyLimit(200);
     setErrorMsg(null);
@@ -181,29 +186,30 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Sender Account</label>
-              <select value={selectedSenderId} onChange={(e) => setSelectedSenderId(e.target.value)} className="input-field">
-                {senders.map((s) => (
-                  <option key={s.id} value={s.id}>{s.displayName} ({s.email})</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label">Start Time (Optional)</label>
-              <input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="input-field" />
-            </div>
+          <div>
+            <label className="label">Sender Account</label>
+            <select value={selectedSenderId} onChange={(e) => setSelectedSenderId(e.target.value)} className="input-field">
+              {senders.map((s) => (
+                <option key={s.id} value={s.id}>{s.displayName} ({s.email})</option>
+              ))}
+            </select>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="label">Send After (seconds)</label>
+              <input type="number" min="0" max="86400" value={sendAfterSeconds} onChange={(e) => setSendAfterSeconds(parseInt(e.target.value, 10) || 0)} className="input-field" />
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Delay before first email is sent</p>
+            </div>
             <div>
               <label className="label">Delay Between Emails (seconds)</label>
               <input type="number" min="1" max="3600" value={delaySeconds} onChange={(e) => setDelaySeconds(parseInt(e.target.value, 10) || 1)} className="input-field" />
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Spacing between each email</p>
             </div>
             <div>
               <label className="label">Hourly Limit</label>
               <input type="number" min="1" max="10000" value={hourlyLimit} onChange={(e) => setHourlyLimit(parseInt(e.target.value, 10) || 200)} className="input-field" />
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Max emails per hour per sender</p>
             </div>
           </div>
 

@@ -43,7 +43,7 @@ router.get('/health', async (_req, res) => {
 
 // Authentication Routes (rate limited)
 router.get('/auth/google/url', authRateLimit, AuthController.getGoogleAuthUrl);
-router.post('/auth/google/callback', authRateLimit, AuthController.googleCallback);
+router.get('/auth/google/callback', authRateLimit, AuthController.googleCallback);
 router.post('/auth/dev-login', authRateLimit, AuthController.devLogin);
 router.get('/auth/me', authenticateJwt, AuthController.getCurrentUser);
 router.post('/auth/logout', authenticateJwt, AuthController.logout);

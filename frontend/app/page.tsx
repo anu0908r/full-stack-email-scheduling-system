@@ -118,7 +118,7 @@ export default function DashboardPage() {
       localStorage.setItem('reachinbox_jwt_token', res.token);
       setUser(res.user);
       refreshAllData();
-      showToast('success', 'Logged in as demo user.');
+      showToast('success', 'Signed in successfully.');
     } catch (e: any) {
       showToast('error', e.response?.data?.error || e.message || 'Dev login failed.');
     }
@@ -183,10 +183,10 @@ export default function DashboardPage() {
               onClick={handleDevLogin}
               className="btn-primary w-full"
             >
-              Login
+              Sign In
             </button>
             <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 12, textAlign: 'center' }}>
-              Demo mode — click Login to continue
+              Quick sign-in without Google
             </p>
           </div>
         </div>
