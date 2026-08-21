@@ -126,7 +126,7 @@ export const createEmailWorker = () => {
         });
 
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('SMTP timeout after 45s')), 45000)
+          setTimeout(() => reject(new Error('SMTP timeout after 20s')), 20000)
         );
 
         const smtpResult = await Promise.race([smtpPromise, timeoutPromise]);

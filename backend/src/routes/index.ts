@@ -6,6 +6,7 @@ import { authenticateJwt } from '../middleware/authMiddleware';
 import { authRateLimit } from '../middleware/rateLimit';
 import { prisma } from '../db/prisma';
 import { redisConnection } from '../db/redis';
+import { emailQueue } from '../queues/emailQueue';
 
 const router = Router();
 
@@ -58,5 +59,18 @@ router.post('/emails/schedule', authenticateJwt, EmailController.scheduleEmails)
 router.get('/emails/scheduled', authenticateJwt, EmailController.getScheduledEmails);
 router.get('/emails/sent', authenticateJwt, EmailController.getSentEmails);
 router.get('/emails/:id', authenticateJwt, EmailController.getEmailById);
+
+// Admin: Clear all data
+router.delete('/admin/clear', authenticateJwt, async (_req, res) => {
+  try {
+    await prisma.email.deleteMany({});
+    await prisma.campaign.deleteMany({});
+    await prisma.sender.deleteMany({});
+    await emailQueue.obliterate({ force: true });
+    res.json({ message: 'All data cleared' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 export default router;

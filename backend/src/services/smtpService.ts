@@ -21,10 +21,10 @@ export interface SendMailResult {
 // Memory cache for auto-generated Ethereal accounts per sender email
 const etherealAccountsCache = new Map<string, { user: string; pass: string; expiresAt: number }>();
 
-// Cache SMTP transporters per sender config to avoid recreating per email
+// Cache SMTP transporters per sender config
 const transporterCache = new Map<string, { transporter: nodemailer.Transporter; expiresAt: number }>();
 
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 function getTransporterKey(host: string, port: number, user: string, pass: string): string {
   return `${host}:${port}:${user}:${pass}`;
@@ -39,45 +39,62 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#039;');
 }
 
-export const sendEmailViaSMTP = async (options: SendMailOptions): Promise<SendMailResult> => {
+function createTransporterInstance(host: string, port: number, user: string, pass: string): nodemailer.Transporter {
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+    connectionTimeout: 10000, // 10s connection timeout
+    greetingTimeout: 10000,   // 10s SMTP greeting timeout
+    socketTimeout: 15000,     // 15s socket timeout
+  });
+}
+
+export const sendEmailViaSMTP = async (options: SendMailOptions, isRetry = false): Promise<SendMailResult> => {
   let host = options.smtpHost || config.etherealHost;
   let port = options.smtpPort || config.etherealPort;
   let user = options.smtpUser || config.etherealUser;
   let pass = options.smtpPass || config.etherealPassword;
 
-  // If no user/pass configured in environment or sender record, generate Ethereal test account dynamically
+  // If no user/pass configured, generate or use cached Ethereal test account
   if (!user || !pass) {
     const cached = etherealAccountsCache.get(options.senderEmail);
-    if (cached && Date.now() < cached.expiresAt) {
+    if (cached && Date.now() < cached.expiresAt && !isRetry) {
       user = cached.user;
       pass = cached.pass;
     } else {
-      const testAccount = await nodemailer.createTestAccount();
-      host = 'smtp.ethereal.email';
-      port = 587;
-      user = testAccount.user;
-      pass = testAccount.pass;
-      etherealAccountsCache.set(options.senderEmail, { user, pass, expiresAt: Date.now() + CACHE_TTL_MS });
-      console.log(`[Ethereal SMTP] Created dynamic test account for ${options.senderEmail}: ${user}`);
+      try {
+        const testAccount = await nodemailer.createTestAccount();
+        host = 'smtp.ethereal.email';
+        port = 587;
+        user = testAccount.user;
+        pass = testAccount.pass;
+        etherealAccountsCache.set(options.senderEmail, { user, pass, expiresAt: Date.now() + CACHE_TTL_MS });
+        console.log(`[Ethereal SMTP] Generated dynamic test account for ${options.senderEmail}: ${user}`);
+      } catch (err: any) {
+        console.error('[Ethereal Account Creation Error]', err.message);
+        throw new Error(`Failed to create Ethereal SMTP test account: ${err.message}`);
+      }
     }
   }
 
   const cacheKey = getTransporterKey(host, port, user!, pass!);
-  const cachedTransporter = transporterCache.get(cacheKey);
   let transporter: nodemailer.Transporter;
-  if (cachedTransporter && Date.now() < cachedTransporter.expiresAt) {
-    transporter = cachedTransporter.transporter;
+
+  if (!isRetry && transporterCache.has(cacheKey)) {
+    const cachedObj = transporterCache.get(cacheKey)!;
+    if (Date.now() < cachedObj.expiresAt) {
+      transporter = cachedObj.transporter;
+    } else {
+      transporter = createTransporterInstance(host, port, user!, pass!);
+      transporterCache.set(cacheKey, { transporter, expiresAt: Date.now() + CACHE_TTL_MS });
+    }
   } else {
-    transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-    });
+    transporter = createTransporterInstance(host, port, user!, pass!);
     transporterCache.set(cacheKey, { transporter, expiresAt: Date.now() + CACHE_TTL_MS });
   }
 
-  // HTML-escape body to prevent injection, then convert newlines to <br/>
   const safeHtml = escapeHtml(options.body).replace(/\n/g, '<br/>');
 
   const mailOptions = {
@@ -88,13 +105,27 @@ export const sendEmailViaSMTP = async (options: SendMailOptions): Promise<SendMa
     text: options.body,
   };
 
-  const info = await transporter.sendMail(mailOptions);
-  const previewUrl = nodemailer.getTestMessageUrl(info) || null;
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    const previewUrl = nodemailer.getTestMessageUrl(info) || null;
 
-  console.log(`[SMTP Sent] MessageId: ${info.messageId} | Preview: ${previewUrl}`);
+    console.log(`[SMTP Sent] MessageId: ${info.messageId} | Preview: ${previewUrl}`);
 
-  return {
-    messageId: info.messageId,
-    previewUrl: previewUrl ? String(previewUrl) : null,
-  };
+    return {
+      messageId: info.messageId,
+      previewUrl: previewUrl ? String(previewUrl) : null,
+    };
+  } catch (err: any) {
+    console.warn(`[SMTP Warning] Send failed on attempt (isRetry=${isRetry}): ${err.message}`);
+
+    // If first attempt failed and we used cached account/transporter, clear cache and retry once with fresh connection
+    if (!isRetry && (!options.smtpUser || !options.smtpPass)) {
+      console.log(`[SMTP Retry] Purging caches for ${options.senderEmail} and retrying with fresh Ethereal credentials...`);
+      etherealAccountsCache.delete(options.senderEmail);
+      transporterCache.delete(cacheKey);
+      return sendEmailViaSMTP(options, true);
+    }
+
+    throw err;
+  }
 };
