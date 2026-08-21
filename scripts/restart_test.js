@@ -1,5 +1,5 @@
 const http = require('http');
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 const path = require('path');
 
 function request(url, options, body) {
@@ -17,6 +17,12 @@ function request(url, options, body) {
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function execAsync(cmd) {
+  return new Promise((resolve) => {
+    exec(cmd, { timeout: 5000 }, (err) => resolve(err));
+  });
 }
 
 async function runRestartTest() {
@@ -58,15 +64,10 @@ async function runRestartTest() {
   const targetEmail = scheduledList.data.emails.find((e) => e.recipient === 'future.restart.lead@example.com');
   console.log('[Step 3] Confirmed email in DB with status:', targetEmail?.status);
 
-  // 5. Actually kill the existing worker process
+  // 5. Kill the existing worker process (async, non-blocking)
   console.log('[Step 4] Terminating existing worker process...');
-  const { execSync } = require('child_process');
-  try {
-    execSync('pkill -f "ts-node src/worker.ts" || true', { timeout: 5000 });
-    console.log('[Step 4a] Old worker process terminated.');
-  } catch (e) {
-    console.log('[Step 4a] No existing worker process to kill (or already stopped).');
-  }
+  await execAsync('pkill -f "ts-node src/worker.ts" || true');
+  console.log('[Step 4a] Old worker process terminated.');
 
   await sleep(2000);
 
@@ -97,11 +98,11 @@ async function runRestartTest() {
 
   console.log('\n=== RESTART TEST RESULT ===');
   if (completedEmail && completedEmail.status === 'SENT') {
-    console.log('✅ RESTART TEST PASSED!');
+    console.log('RESTART TEST PASSED!');
     console.log('   Email survived worker restart and was executed at intended time.');
     console.log('   Preview Link:', completedEmail.etherealPreviewUrl);
   } else {
-    console.error('❌ RESTART TEST FAILED! Email state:', completedEmail);
+    console.error('RESTART TEST FAILED! Email state:', completedEmail);
   }
 
   // Cleanup: kill the spawned worker

@@ -20,7 +20,6 @@ export const config = {
   workerConcurrency: parseInt(process.env.WORKER_CONCURRENCY || '5', 10),
   minEmailDelayMs: parseInt(process.env.MIN_EMAIL_DELAY_MS || '2000', 10),
   maxEmailsPerHourPerSender: parseInt(process.env.MAX_EMAILS_PER_HOUR_PER_SENDER || '200', 10),
-  sessionSecret: process.env.SESSION_SECRET || 'super-secret-session-key',
   jwtSecret: process.env.JWT_SECRET || 'reachinbox-jwt-secret-key',
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
 };

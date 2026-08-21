@@ -3,6 +3,8 @@ import cors from 'cors';
 import { config } from './config';
 import routes from './routes';
 import { errorHandler } from './middleware/errorHandler';
+import { prisma } from './db/prisma';
+import { redisConnection } from './db/redis';
 
 const app = express();
 
@@ -21,9 +23,23 @@ app.use(errorHandler);
 const PORT = config.port;
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`[Express API Server] Running on http://localhost:${PORT}`);
   });
+
+  const shutdown = async (signal: string) => {
+    console.log(`[API Server] ${signal} received. Shutting down gracefully...`);
+    server.close(async () => {
+      await prisma.$disconnect();
+      redisConnection.disconnect();
+      process.exit(0);
+    });
+    // Force exit after 10s
+    setTimeout(() => process.exit(1), 10000);
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 export default app;

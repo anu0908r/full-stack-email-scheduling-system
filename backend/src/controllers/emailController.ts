@@ -62,7 +62,12 @@ export class EmailController {
       });
     } catch (err: any) {
       console.error('[Schedule API Error]', err.message);
-      res.status(400).json({ error: err.message });
+      // Distinguish validation/client errors (400) from server errors (500)
+      const isClientError = err.message.includes('not found') ||
+        err.message.includes('does not belong') ||
+        err.message.includes('No valid email') ||
+        err.message.includes('Invalid startTime');
+      res.status(isClientError ? 400 : 500).json({ error: err.message });
     }
   }
 
