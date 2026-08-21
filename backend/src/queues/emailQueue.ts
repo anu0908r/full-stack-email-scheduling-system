@@ -20,14 +20,14 @@ export const emailQueue = new Queue<EmailJobData>(EMAIL_QUEUE_NAME, {
   },
 });
 
-export const addEmailToQueue = async (emailId: string, delayMs: number): Promise<string> => {
+export const addEmailToQueue = async (emailId: string, delayMs: number, uniqueId?: string): Promise<string> => {
   const safeDelay = Math.max(0, delayMs);
   const job = await emailQueue.add(
     'send-email',
     { emailId },
     {
       delay: safeDelay,
-      jobId: emailId, // Guarantees job uniqueness in BullMQ
+      jobId: uniqueId ?? emailId,
     }
   );
   return job.id ?? emailId;
