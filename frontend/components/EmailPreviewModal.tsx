@@ -95,7 +95,7 @@ export const EmailPreviewModal: React.FC<EmailPreviewModalProps> = ({
 
         {/* Footer Actions */}
         <div className="flex items-center justify-between pt-2">
-          {email.etherealPreviewUrl && isRealEtherealUrl ? (
+          {email.etherealPreviewUrl ? (
             <a
               href={email.etherealPreviewUrl}
               target="_blank"
@@ -108,7 +108,7 @@ export const EmailPreviewModal: React.FC<EmailPreviewModalProps> = ({
             </a>
           ) : (
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Render Cloud Inbox View Active
+              In-App Preview Active
             </span>
           )}
 

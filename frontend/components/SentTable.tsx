@@ -72,7 +72,7 @@ export const SentTable: React.FC<SentTableProps> = ({
                   <th className="px-5 py-3 font-semibold" style={{ color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Subject</th>
                   <th className="px-5 py-3 font-semibold" style={{ color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sent At</th>
                   <th className="px-5 py-3 font-semibold" style={{ color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</th>
-                  <th className="px-5 py-3 font-semibold" style={{ color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Preview</th>
+                  <th className="px-5 py-3 font-semibold" style={{ color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Preview / Links</th>
                   <th className="px-5 py-3 font-semibold text-right" style={{ color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Actions</th>
                 </tr>
               </thead>
@@ -96,14 +96,37 @@ export const SentTable: React.FC<SentTableProps> = ({
                       )}
                     </td>
                     <td className="px-5 py-3.5">
-                      <button
-                        onClick={() => setSelectedPreviewEmail(email)}
-                        className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors hover:bg-gray-100"
-                        style={{ color: 'var(--accent)', border: '1px solid var(--border)' }}
-                      >
-                        <Eye size={12} />
-                        View email
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setSelectedPreviewEmail(email)}
+                          className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors hover:bg-gray-100"
+                          style={{ color: 'var(--accent)', border: '1px solid var(--border)' }}
+                          title="View content"
+                        >
+                          <Eye size={12} />
+                          Preview
+                        </button>
+
+                        {email.etherealPreviewUrl && (
+                          <a
+                            href={email.etherealPreviewUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors bg-blue-50 text-blue-700 hover:bg-blue-100"
+                            style={{ border: '1px solid rgba(59, 130, 246, 0.3)' }}
+                            title="Open live Ethereal mailbox page"
+                          >
+                            <ExternalLink size={12} />
+                            Ethereal
+                          </a>
+                        )}
+
+                        {email.errorMessage && !email.etherealPreviewUrl && (
+                          <span className="text-xs truncate max-w-xs block text-red-600" title={email.errorMessage}>
+                            {email.errorMessage}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       {onDeleteEmail && (

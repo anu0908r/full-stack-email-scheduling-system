@@ -43,26 +43,13 @@ function createTransporterInstance(host: string, port: number, user: string, pas
     port,
     secure: port === 465,
     auth: { user, pass },
-    connectionTimeout: 5000, // 5s connection timeout for fast failover on cloud hosts
-    greetingTimeout: 5000,   // 5s greeting timeout
-    socketTimeout: 8000,     // 8s socket timeout
+    connectionTimeout: 20000, // 20s timeout to allow cloud TLS handshakes to complete
+    greetingTimeout: 20000,   // 20s greeting timeout
+    socketTimeout: 20000,     // 20s socket timeout
   });
 }
 
-function generateSimulatedEtherealResult(senderEmail: string, recipient: string): SendMailResult {
-  const randomHash = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-  const messageId = `<${Date.now()}.${randomHash}@ethereal.email>`;
-  const previewUrl = `https://ethereal.email/message/${randomHash}`;
-
-  console.log(`[Ethereal Cloud Sandbox] Outbound SMTP port blocked on cloud host. Delivered via Ethereal Sandbox Simulator! MessageId: ${messageId}`);
-
-  return {
-    messageId,
-    previewUrl,
-  };
-}
-
-export const sendEmailViaSMTP = async (options: SendMailOptions, isRetry = false): Promise<SendMailResult> => {
+export const sendEmailViaSMTP = async (options: SendMailOptions, retryAttempt = 0): Promise<SendMailResult> => {
   let host = options.smtpHost || config.etherealHost;
   let port = options.smtpPort || config.etherealPort;
   let user = options.smtpUser || config.etherealUser;
@@ -70,28 +57,29 @@ export const sendEmailViaSMTP = async (options: SendMailOptions, isRetry = false
 
   const isCustomSmtp = Boolean(options.smtpUser && options.smtpPass && options.smtpHost);
 
-  // If no custom SMTP credentials provided, use/generate Ethereal account
+  // If fallback attempts for default Ethereal, try alternate ports (587 -> 2525 -> 465)
+  if (!isCustomSmtp && retryAttempt > 0) {
+    if (retryAttempt === 1) port = 2525;
+    else if (retryAttempt === 2) port = 465;
+  }
+
+  // Generate or retrieve cached Ethereal test account
   if (!user || !pass) {
     const cached = etherealAccountsCache.get(options.senderEmail);
-    if (cached && Date.now() < cached.expiresAt && !isRetry) {
+    if (cached && Date.now() < cached.expiresAt && retryAttempt === 0) {
       user = cached.user;
       pass = cached.pass;
     } else {
       try {
         const testAccount = await nodemailer.createTestAccount();
         host = 'smtp.ethereal.email';
-        port = 587;
         user = testAccount.user;
         pass = testAccount.pass;
         etherealAccountsCache.set(options.senderEmail, { user, pass, expiresAt: Date.now() + CACHE_TTL_MS });
         console.log(`[Ethereal SMTP] Generated dynamic test account for ${options.senderEmail}: ${user}`);
       } catch (err: any) {
-        console.warn('[Ethereal Account Creation Warning] Ethereal API unreachable from cloud host:', err.message);
-        // Fallback to Simulated Ethereal Sandbox if cloud host blocks Ethereal account API
-        if (!isCustomSmtp) {
-          return generateSimulatedEtherealResult(options.senderEmail, options.recipient);
-        }
-        throw err;
+        console.error('[Ethereal Account Creation Error]', err.message);
+        throw new Error(`Failed to create Ethereal SMTP test account: ${err.message}`);
       }
     }
   }
@@ -99,7 +87,7 @@ export const sendEmailViaSMTP = async (options: SendMailOptions, isRetry = false
   const cacheKey = getTransporterKey(host, port, user!, pass!);
   let transporter: nodemailer.Transporter;
 
-  if (!isRetry && transporterCache.has(cacheKey)) {
+  if (retryAttempt === 0 && transporterCache.has(cacheKey)) {
     const cachedObj = transporterCache.get(cacheKey)!;
     if (Date.now() < cachedObj.expiresAt) {
       transporter = cachedObj.transporter;
@@ -126,25 +114,26 @@ export const sendEmailViaSMTP = async (options: SendMailOptions, isRetry = false
     const info = await transporter.sendMail(mailOptions);
     const previewUrl = nodemailer.getTestMessageUrl(info) || null;
 
-    console.log(`[SMTP Sent] MessageId: ${info.messageId} | Preview: ${previewUrl}`);
+    console.log(`[SMTP Sent] MessageId: ${info.messageId} | Live Ethereal Preview: ${previewUrl}`);
 
     return {
       messageId: info.messageId,
       previewUrl: previewUrl ? String(previewUrl) : null,
     };
   } catch (err: any) {
-    console.warn(`[SMTP Warning] Connection/Send failed (isRetry=${isRetry}): ${err.message}`);
+    console.warn(`[SMTP Warning] Connection/Send failed on port ${port} (retryAttempt=${retryAttempt}): ${err.message}`);
 
-    // If default Ethereal transport fails due to Render outbound SMTP port block, fallback to Ethereal Cloud Sandbox
-    if (!isCustomSmtp) {
-      console.log(`[SMTP Cloud Fallback] Port ${port} blocked on host. Switching to Ethereal Cloud Sandbox...`);
-      return generateSimulatedEtherealResult(options.senderEmail, options.recipient);
+    // If default Ethereal transport failed, purge cache and try alternate ports (up to 3 attempts)
+    if (!isCustomSmtp && retryAttempt < 2) {
+      console.log(`[SMTP Port Failover] Retrying Ethereal send on alternate port...`);
+      etherealAccountsCache.delete(options.senderEmail);
+      transporterCache.delete(cacheKey);
+      return sendEmailViaSMTP(options, retryAttempt + 1);
     }
 
-    // If custom SMTP failed on first try, purge transporter cache and retry once
-    if (!isRetry) {
+    if (isCustomSmtp && retryAttempt === 0) {
       transporterCache.delete(cacheKey);
-      return sendEmailViaSMTP(options, true);
+      return sendEmailViaSMTP(options, 1);
     }
 
     throw err;
