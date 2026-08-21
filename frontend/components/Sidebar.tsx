@@ -85,7 +85,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             onClick={() => onTabChange('scheduled')}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+            className="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
             style={{
               background: activeTab === 'scheduled' ? 'var(--accent-light)' : 'transparent',
               color: activeTab === 'scheduled' ? 'var(--accent)' : 'var(--text-secondary)',
@@ -100,7 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             onClick={() => onTabChange('sent')}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+            className="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
             style={{
               background: activeTab === 'sent' ? 'var(--accent-light)' : 'transparent',
               color: activeTab === 'sent' ? 'var(--accent)' : 'var(--text-secondary)',
@@ -118,7 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="px-3 py-4" style={{ borderTop: '1px solid var(--border)' }}>
           <button
             onClick={onSenders}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+            className="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
             style={{ color: 'var(--text-secondary)' }}
           >
             <Users size={18} />
@@ -127,7 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             onClick={onLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+            className="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
             style={{ color: 'var(--text-muted)' }}
           >
             <LogOut size={18} />

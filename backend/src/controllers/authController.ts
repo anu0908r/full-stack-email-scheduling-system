@@ -116,7 +116,7 @@ export class AuthController {
     }
 
     try {
-      const { email = 'demo.user@reachinbox.ai', name = 'Demo Engineer' } = req.body;
+      const { email = 'user@reachinbox.ai', name = 'ReachInbox User' } = req.body;
       const googleId = `dev-google-${email}`;
       const avatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`;
 

@@ -109,7 +109,7 @@ export default function DashboardPage() {
       localStorage.setItem('reachinbox_jwt_token', res.token);
       setUser(res.user);
       refreshAllData();
-      showToast('success', 'Logged in as demo user.');
+      showToast('success', 'Signed in successfully.');
     } catch (e: any) {
       showToast('error', e.response?.data?.error || e.message || 'Dev login failed.');
     }
@@ -183,10 +183,10 @@ export default function DashboardPage() {
             className="btn-primary"
             style={{ width: '100%', padding: '14px 20px', fontSize: 16 }}
           >
-            Sign In (Demo)
+            Sign In
           </button>
           <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 16 }}>
-            Use Google for production, or Demo for quick testing
+            Quick sign-in without Google
           </p>
         </div>
       </div>
@@ -206,7 +206,7 @@ export default function DashboardPage() {
         onLogout={handleLogout}
       />
 
-      <main className="flex-1 ml-0 md:ml-64 p-4 md:p-8">
+      <main className="flex-1 ml-0 md:ml-64 p-4 md:p-8 animate-fade-in">
         <div className="max-w-6xl mx-auto">
           {activeTab === 'scheduled' ? (
             <ScheduledTable emails={scheduledEmails} loading={loadingScheduled} onRefresh={fetchScheduled} />
@@ -232,7 +232,7 @@ export default function DashboardPage() {
 
       {toast && (
         <div
-          className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg text-sm font-medium"
+          className="toast fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg text-sm font-medium shadow-lg"
           style={{
             background: toast.type === 'success' ? 'var(--success-light)' : 'var(--danger-light)',
             color: toast.type === 'success' ? '#166534' : '#991b1b',
