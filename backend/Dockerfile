@@ -8,9 +8,10 @@ COPY package*.json ./
 COPY prisma ./prisma/
 RUN npm install
 RUN npx prisma generate
-RUN npm run build
 
 COPY . .
+
+RUN npx tsc
 
 EXPOSE 10000
 
