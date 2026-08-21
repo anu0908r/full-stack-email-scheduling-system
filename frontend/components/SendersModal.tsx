@@ -92,7 +92,7 @@ export const SendersModal: React.FC<SendersModalProps> = ({
           </div>
         )}
 
-        {senders.length > 0 && (
+        {senders.length > 0 ? (
           <div className="mb-6">
             <h4 className="label">Active Senders ({senders.length})</h4>
             <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -119,6 +119,10 @@ export const SendersModal: React.FC<SendersModalProps> = ({
                 </div>
               ))}
             </div>
+          </div>
+        ) : (
+          <div className="mb-6 p-4 text-center rounded-lg border border-dashed" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)', fontSize: 13 }}>
+            No senders configured yet. Add your sender account details below.
           </div>
         )}
 

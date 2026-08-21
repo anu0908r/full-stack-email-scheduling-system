@@ -13,22 +13,10 @@ export class SenderController {
         return;
       }
 
-      let senders = await prisma.sender.findMany({
+      const senders = await prisma.sender.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
       });
-
-      if (senders.length === 0) {
-        const defaultSender = await prisma.sender.create({
-          data: {
-            userId,
-            email: 'outreach@reachinbox.ai',
-            displayName: 'ReachInbox Primary Sender',
-            hourlyLimit: config.maxEmailsPerHourPerSender,
-          },
-        });
-        senders = [defaultSender];
-      }
 
       res.json({ senders });
     } catch (err: any) {
@@ -53,10 +41,22 @@ export class SenderController {
 
       const { email, displayName, hourlyLimit, smtpHost, smtpPort, smtpUser, smtpPass } = parsed.data;
 
+      const cleanEmail = email.trim().toLowerCase();
+
+      // Check if sender with same email already exists for this user
+      const existing = await prisma.sender.findFirst({
+        where: { userId, email: cleanEmail },
+      });
+
+      if (existing) {
+        res.status(400).json({ error: `Sender with email '${cleanEmail}' already exists.` });
+        return;
+      }
+
       const sender = await prisma.sender.create({
         data: {
           userId,
-          email: email.trim().toLowerCase(),
+          email: cleanEmail,
           displayName,
           hourlyLimit: hourlyLimit ?? config.maxEmailsPerHourPerSender,
           smtpHost: smtpHost || null,
@@ -98,7 +98,7 @@ export class SenderController {
       });
 
       if (activeEmails > 0) {
-        res.status(400).json({ error: `Cannot delete sender with ${activeEmails} active email(s). Wait for them to complete or fail.` });
+        res.status(400).json({ error: `Cannot delete sender with ${activeEmails} active scheduled email(s). Delete or clear scheduled emails first.` });
         return;
       }
 

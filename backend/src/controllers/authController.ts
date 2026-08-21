@@ -126,18 +126,7 @@ export class AuthController {
         create: { googleId, email, name, avatar },
       });
 
-      // Automatically create a default Sender for this dev user if none exists
-      const existingSenderCount = await prisma.sender.count({ where: { userId: user.id } });
-      if (existingSenderCount === 0) {
-        await prisma.sender.create({
-          data: {
-            userId: user.id,
-            email: 'outreach@reachinbox.ai',
-            displayName: 'ReachInbox Growth Sender',
-            hourlyLimit: config.maxEmailsPerHourPerSender,
-          },
-        });
-      }
+
 
       const token = jwt.sign(
         { userId: user.id, email: user.email, name: user.name },

@@ -189,9 +189,13 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
           <div>
             <label className="label">Sender Account</label>
             <select value={selectedSenderId} onChange={(e) => setSelectedSenderId(e.target.value)} className="input-field">
-              {senders.map((s) => (
-                <option key={s.id} value={s.id}>{s.displayName} ({s.email})</option>
-              ))}
+              {senders.length === 0 ? (
+                <option value="">No senders available — please add one in Manage Senders</option>
+              ) : (
+                senders.map((s) => (
+                  <option key={s.id} value={s.id}>{s.displayName} ({s.email})</option>
+                ))
+              )}
             </select>
           </div>
 
