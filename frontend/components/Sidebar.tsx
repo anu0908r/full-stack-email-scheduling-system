@@ -1,8 +1,34 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { UserProfile } from '../services/api';
 import { Mail, PenSquare, Users, Clock, Send, LogOut } from 'lucide-react';
+
+function AnimatedCount({ value }: { value: number }) {
+  const [display, setDisplay] = useState(value);
+  const prev = useRef(value);
+
+  useEffect(() => {
+    if (prev.current === value) return;
+    const start = prev.current;
+    const end = value;
+    const duration = 300;
+    const startTime = Date.now();
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(Math.round(start + (end - start) * eased));
+      if (progress < 1) requestAnimationFrame(animate);
+    };
+
+    requestAnimationFrame(animate);
+    prev.current = value;
+  }, [value]);
+
+  return <>{display}</>;
+}
 
 interface SidebarProps {
   user: UserProfile;
@@ -85,7 +111,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             onClick={() => onTabChange('scheduled')}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+            className="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
             style={{
               background: activeTab === 'scheduled' ? 'var(--accent-light)' : 'transparent',
               color: activeTab === 'scheduled' ? 'var(--accent)' : 'var(--text-secondary)',
@@ -94,13 +120,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <Clock size={18} />
             <span className="flex-1 text-left">Scheduled</span>
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: activeTab === 'scheduled' ? 'var(--accent)' : 'var(--bg-hover)', color: activeTab === 'scheduled' ? 'white' : 'var(--text-muted)' }}>
-              {scheduledCount}
+              <AnimatedCount value={scheduledCount} />
             </span>
           </button>
 
           <button
             onClick={() => onTabChange('sent')}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+            className="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
             style={{
               background: activeTab === 'sent' ? 'var(--accent-light)' : 'transparent',
               color: activeTab === 'sent' ? 'var(--accent)' : 'var(--text-secondary)',
@@ -109,7 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <Send size={18} />
             <span className="flex-1 text-left">Sent</span>
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: activeTab === 'sent' ? 'var(--accent)' : 'var(--bg-hover)', color: activeTab === 'sent' ? 'white' : 'var(--text-muted)' }}>
-              {sentCount}
+              <AnimatedCount value={sentCount} />
             </span>
           </button>
         </nav>
@@ -118,7 +144,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="px-3 py-4" style={{ borderTop: '1px solid var(--border)' }}>
           <button
             onClick={onSenders}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+            className="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
             style={{ color: 'var(--text-secondary)' }}
           >
             <Users size={18} />
@@ -127,7 +153,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             onClick={onLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+            className="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
             style={{ color: 'var(--text-muted)' }}
           >
             <LogOut size={18} />
