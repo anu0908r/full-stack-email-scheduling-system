@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { EmailSchedulingService } from '../services/emailSchedulingService';
 import { prisma } from '../db/prisma';
+import { emailQueue } from '../queues/emailQueue';
 
 const scheduleEmailsSchema = z.object({
   senderId: z.string().min(1, 'senderId is required'),
@@ -62,7 +63,6 @@ export class EmailController {
       });
     } catch (err: any) {
       console.error('[Schedule API Error]', err.message);
-      // Distinguish validation/client errors (400) from server errors (500)
       const isClientError = err.message.includes('not found') ||
         err.message.includes('does not belong') ||
         err.message.includes('No valid email') ||
@@ -160,7 +160,7 @@ export class EmailController {
   }
 
   /**
-   * Get email details by ID (verify user owns the campaign)
+   * Get email details by ID
    */
   public static async getEmailById(req: AuthRequest, res: Response): Promise<void> {
     try {
@@ -187,6 +187,109 @@ export class EmailController {
       }
 
       res.json({ email });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  /**
+   * Delete a single email record by ID
+   */
+  public static async deleteEmailById(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(401).json({ error: 'User unauthorized' });
+        return;
+      }
+
+      const { id } = req.params;
+      const email = await prisma.email.findUnique({
+        where: { id },
+        include: { campaign: true },
+      });
+
+      if (!email) {
+        res.status(404).json({ error: 'Email record not found' });
+        return;
+      }
+
+      if (email.campaign.userId !== userId) {
+        res.status(403).json({ error: 'Access denied' });
+        return;
+      }
+
+      // If scheduled with a BullMQ job, attempt to remove job from queue
+      if (email.bullJobId) {
+        try {
+          const job = await emailQueue.getJob(email.bullJobId);
+          if (job) await job.remove();
+        } catch {
+          // Ignore if job completed or already removed
+        }
+      }
+
+      await prisma.email.delete({ where: { id } });
+
+      res.json({ message: 'Email deleted successfully' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  /**
+   * Clear emails by category ('scheduled', 'sent', 'all') for the logged in user
+   */
+  public static async clearEmailsByCategory(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(401).json({ error: 'User unauthorized' });
+        return;
+      }
+
+      const category = (req.params.category || '').toLowerCase();
+      let statusFilter: string[] = [];
+
+      if (category === 'scheduled') {
+        statusFilter = ['SCHEDULED', 'PROCESSING'];
+      } else if (category === 'sent') {
+        statusFilter = ['SENT', 'FAILED'];
+      } else if (category === 'all') {
+        statusFilter = ['SCHEDULED', 'PROCESSING', 'SENT', 'FAILED'];
+      } else {
+        res.status(400).json({ error: "Invalid category. Must be 'scheduled', 'sent', or 'all'." });
+        return;
+      }
+
+      // Fetch emails to remove BullMQ jobs if scheduled
+      const emailsToDelete = await prisma.email.findMany({
+        where: {
+          status: { in: statusFilter },
+          campaign: { userId },
+        },
+        select: { id: true, bullJobId: true },
+      });
+
+      // Remove jobs from queue
+      for (const email of emailsToDelete) {
+        if (email.bullJobId) {
+          try {
+            const job = await emailQueue.getJob(email.bullJobId);
+            if (job) await job.remove();
+          } catch {
+            // Ignore
+          }
+        }
+      }
+
+      const deleted = await prisma.email.deleteMany({
+        where: {
+          id: { in: emailsToDelete.map((e) => e.id) },
+        },
+      });
+
+      res.json({ message: `Successfully deleted ${deleted.count} email records.`, count: deleted.count });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

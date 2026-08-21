@@ -2,18 +2,22 @@
 
 import React from 'react';
 import { EmailRecord } from '../services/api';
-import { Clock, RefreshCw, Calendar } from 'lucide-react';
+import { Clock, RefreshCw, Calendar, Trash2 } from 'lucide-react';
 
 interface ScheduledTableProps {
   emails: EmailRecord[];
   loading: boolean;
   onRefresh: () => void;
+  onDeleteEmail?: (id: string) => void;
+  onClearAll?: () => void;
 }
 
 export const ScheduledTable: React.FC<ScheduledTableProps> = ({
   emails,
   loading,
   onRefresh,
+  onDeleteEmail,
+  onClearAll,
 }) => {
   return (
     <div className="card overflow-hidden">
@@ -22,10 +26,26 @@ export const ScheduledTable: React.FC<ScheduledTableProps> = ({
           <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>Scheduled Emails</h2>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{emails.length} emails in queue</p>
         </div>
-        <button onClick={onRefresh} className="btn-outline flex items-center gap-2 text-sm" style={{ padding: '8px 14px' }}>
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          {emails.length > 0 && onClearAll && (
+            <button
+              onClick={() => {
+                if (window.confirm('Are you sure you want to cancel and delete all scheduled emails in queue?')) {
+                  onClearAll();
+                }
+              }}
+              className="btn-outline flex items-center gap-1.5 text-xs text-red-600 hover:bg-red-50"
+              style={{ padding: '8px 12px', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+            >
+              <Trash2 size={14} />
+              Clear Queue
+            </button>
+          )}
+          <button onClick={onRefresh} className="btn-outline flex items-center gap-2 text-sm" style={{ padding: '8px 14px' }}>
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -48,6 +68,7 @@ export const ScheduledTable: React.FC<ScheduledTableProps> = ({
                 <th className="px-5 py-3 font-semibold" style={{ color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Subject</th>
                 <th className="px-5 py-3 font-semibold" style={{ color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Scheduled</th>
                 <th className="px-5 py-3 font-semibold" style={{ color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</th>
+                <th className="px-5 py-3 font-semibold text-right" style={{ color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Actions</th>
               </tr>
             </thead>
             <tbody className="stagger-children">
@@ -72,6 +93,21 @@ export const ScheduledTable: React.FC<ScheduledTableProps> = ({
                       <span className={`badge ${email.status === 'PROCESSING' ? 'badge-processing' : 'badge-scheduled'}`}>
                         {email.status}
                       </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      {onDeleteEmail && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Delete scheduled email to ${email.recipient}?`)) {
+                              onDeleteEmail(email.id);
+                            }
+                          }}
+                          className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
+                          title="Delete email"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );

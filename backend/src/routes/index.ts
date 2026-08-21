@@ -58,6 +58,8 @@ router.delete('/senders/:id', authenticateJwt, SenderController.deleteSender);
 router.post('/emails/schedule', authenticateJwt, EmailController.scheduleEmails);
 router.get('/emails/scheduled', authenticateJwt, EmailController.getScheduledEmails);
 router.get('/emails/sent', authenticateJwt, EmailController.getSentEmails);
+router.delete('/emails/clear/:category', authenticateJwt, EmailController.clearEmailsByCategory);
+router.delete('/emails/:id', authenticateJwt, EmailController.deleteEmailById);
 router.get('/emails/:id', authenticateJwt, EmailController.getEmailById);
 
 // Admin: Clear all data

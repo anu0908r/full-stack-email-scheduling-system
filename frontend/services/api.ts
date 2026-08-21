@@ -138,4 +138,11 @@ export const emailService = {
     const res = await api.get(`/emails/${id}`);
     return res.data.email;
   },
+  deleteEmail: async (id: string): Promise<void> => {
+    await api.delete(`/emails/${id}`);
+  },
+  clearEmails: async (category: 'scheduled' | 'sent' | 'all'): Promise<{ message?: string; count: number }> => {
+    const res = await api.delete(`/emails/clear/${category}`);
+    return res.data;
+  },
 };

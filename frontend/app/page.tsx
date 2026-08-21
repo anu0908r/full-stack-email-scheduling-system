@@ -132,6 +132,26 @@ export default function DashboardPage() {
     showToast('success', msg);
   };
 
+  const handleDeleteEmail = async (id: string) => {
+    try {
+      await emailService.deleteEmail(id);
+      showToast('success', 'Email record deleted.');
+      refreshAllData();
+    } catch (e: any) {
+      showToast('error', e.response?.data?.error || 'Failed to delete email.');
+    }
+  };
+
+  const handleClearCategory = async (category: 'scheduled' | 'sent') => {
+    try {
+      const res = await emailService.clearEmails(category);
+      showToast('success', res.message || 'Emails cleared.');
+      refreshAllData();
+    } catch (e: any) {
+      showToast('error', e.response?.data?.error || 'Failed to clear emails.');
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
@@ -210,9 +230,21 @@ export default function DashboardPage() {
       <main className="flex-1 ml-0 md:ml-64 p-4 md:p-8 animate-fade-in">
         <div className="max-w-6xl mx-auto">
           {activeTab === 'scheduled' ? (
-            <ScheduledTable emails={scheduledEmails} loading={loadingScheduled} onRefresh={fetchScheduled} />
+            <ScheduledTable
+              emails={scheduledEmails}
+              loading={loadingScheduled}
+              onRefresh={fetchScheduled}
+              onDeleteEmail={handleDeleteEmail}
+              onClearAll={() => handleClearCategory('scheduled')}
+            />
           ) : (
-            <SentTable emails={sentEmails} loading={loadingSent} onRefresh={fetchSent} />
+            <SentTable
+              emails={sentEmails}
+              loading={loadingSent}
+              onRefresh={fetchSent}
+              onDeleteEmail={handleDeleteEmail}
+              onClearAll={() => handleClearCategory('sent')}
+            />
           )}
         </div>
       </main>
