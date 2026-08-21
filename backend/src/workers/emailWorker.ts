@@ -71,7 +71,7 @@ export const createEmailWorker = () => {
           data: { status: 'SCHEDULED' },
         });
 
-        await addEmailToQueue(emailId, throttleCheck.retryAfterMs, `${emailId}-${Date.now()}`);
+        await addEmailToQueue(emailId, throttleCheck.retryAfterMs, `throttle-${emailId}`);
         return;
       }
 
@@ -96,7 +96,7 @@ export const createEmailWorker = () => {
           },
         });
 
-        await addEmailToQueue(emailId, delayUntilNextWindow, `${emailId}-${Date.now()}`);
+        await addEmailToQueue(emailId, delayUntilNextWindow, `ratelimit-${emailId}`);
         return;
       }
 
