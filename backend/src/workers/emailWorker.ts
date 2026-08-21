@@ -40,11 +40,11 @@ export const createEmailWorker = () => {
         return;
       }
 
-      // 2c. Stuck PROCESSING recovery: if email is PROCESSING for > 2 minutes, reset to SCHEDULED
+      // 2c. Stuck PROCESSING recovery: if email is PROCESSING for > 15 seconds, process it
       if (email.status === 'PROCESSING') {
         const stuckDuration = Date.now() - new Date(email.updatedAt).getTime();
-        if (stuckDuration > 120000) {
-          console.log(`[Worker] Email ${emailId} stuck in PROCESSING for ${Math.round(stuckDuration / 1000)}s. Resetting to SCHEDULED.`);
+        if (stuckDuration > 15000) {
+          console.log(`[Worker] Email ${emailId} stuck in PROCESSING for ${Math.round(stuckDuration / 1000)}s. Resuming execution.`);
         } else {
           console.log(`[Worker] Email ${emailId} is PROCESSING (${Math.round(stuckDuration / 1000)}s). Skipping.`);
           return;
@@ -126,7 +126,7 @@ export const createEmailWorker = () => {
         });
 
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('SMTP timeout after 45s')), 45000)
+          setTimeout(() => reject(new Error('SMTP timeout after 15s')), 15000)
         );
 
         const smtpResult = await Promise.race([smtpPromise, timeoutPromise]);
