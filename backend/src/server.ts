@@ -4,7 +4,7 @@ import { config } from './config';
 import routes from './routes';
 import { errorHandler } from './middleware/errorHandler';
 import { prisma } from './db/prisma';
-import { redisConnection } from './db/redis';
+import { redisConnection, redisQueue, redisWorker } from './db/redis';
 import { createEmailWorker } from './workers/emailWorker';
 import { RecoveryService } from './services/recoveryService';
 
@@ -43,6 +43,8 @@ if (process.env.NODE_ENV !== 'test') {
         await worker.close();
         await prisma.$disconnect();
         redisConnection.disconnect();
+        redisQueue.disconnect();
+        redisWorker.disconnect();
         process.exit(0);
       });
       setTimeout(() => process.exit(1), 10000);

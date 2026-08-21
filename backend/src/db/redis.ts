@@ -1,18 +1,26 @@
 import Redis from 'ioredis';
 import { config } from '../config';
 
-export const redisConnection = new Redis(config.redisUrl, {
-  maxRetriesPerRequest: null, // Required by BullMQ
-  enableReadyCheck: false,
-  lazyConnect: false,
-  reconnectOnError: () => true,
-});
+function createRedis(name: string): Redis {
+  const conn = new Redis(config.redisUrl, {
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+    lazyConnect: false,
+    reconnectOnError: () => true,
+  });
 
-redisConnection.on('error', (err) => {
-  if (err.message.includes('Connection is closed')) return;
-  console.error('[Redis Error]', err.message);
-});
+  conn.on('error', (err) => {
+    if (err.message.includes('Connection is closed')) return;
+    console.error(`[Redis ${name} Error]`, err.message);
+  });
 
-redisConnection.on('connect', () => {
-  console.log('[Redis] Connected');
-});
+  conn.on('connect', () => {
+    console.log(`[Redis ${name}] Connected`);
+  });
+
+  return conn;
+}
+
+export const redisConnection = createRedis('Main');
+export const redisQueue = createRedis('Queue');
+export const redisWorker = createRedis('Worker');
