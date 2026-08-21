@@ -1,13 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Header } from '../components/Header';
 import { ScheduledTable } from '../components/ScheduledTable';
 import { SentTable } from '../components/SentTable';
 import { ComposeModal } from '../components/ComposeModal';
 import { SendersModal } from '../components/SendersModal';
+import { Sidebar } from '../components/Sidebar';
 import { authService, senderService, emailService, UserProfile, Sender, EmailRecord, ScheduleResponse } from '../services/api';
-import { Plus, Users, Clock, Send, Zap } from 'lucide-react';
 
 export default function DashboardPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -26,7 +25,7 @@ export default function DashboardPage() {
 
   const showToast = useCallback((type: 'success' | 'error', message: string) => {
     setToast({ type, message });
-    setTimeout(() => setToast(null), 5000);
+    setTimeout(() => setToast(null), 4000);
   }, []);
 
   const checkAuth = useCallback(async () => {
@@ -98,7 +97,7 @@ export default function DashboardPage() {
     try {
       await authService.logout();
     } catch {
-      // Ignore errors — clear client state regardless
+      // Ignore
     }
     localStorage.removeItem('reachinbox_jwt_token');
     setUser(null);
@@ -135,10 +134,10 @@ export default function DashboardPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-drafting-grid flex items-center justify-center font-mono text-[#1F2736]">
-        <div className="p-8 bg-[#F7F1EB] border-blueprint text-center">
-          <div className="w-10 h-10 border-4 border-[#1F2736] border-t-transparent animate-spin mx-auto mb-4" />
-          <p className="font-bold text-sm">INITIALIZING EMAIL SCHEDULING SYSTEM...</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
+        <div className="text-center">
+          <div className="spinner mx-auto mb-4" style={{ width: 32, height: 32, borderWidth: 3 }} />
+          <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Loading...</p>
         </div>
       </div>
     );
@@ -146,28 +145,49 @@ export default function DashboardPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-drafting-grid flex items-center justify-center font-mono text-[#1F2736]">
-        <div className="p-10 bg-[#F7F1EB] border-blueprint text-center max-w-md">
-          <div className="w-14 h-14 bg-[#D63A35] text-white flex items-center justify-center font-bold text-2xl border-blueprint-sm mx-auto mb-6">
-            R
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'var(--bg-primary)' }}>
+        <div className="card p-8 w-full max-w-md text-center">
+          <div className="flex items-center justify-center gap-2 mb-6">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--accent)' }}>
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+            </svg>
+            <span style={{ fontWeight: 700, fontSize: 18, color: 'var(--text-primary)' }}>ReachInbox</span>
           </div>
-          <h1 className="text-3xl font-bold font-serif-display mb-2">REACHINBOX</h1>
-          <p className="text-xs font-mono text-[#445166] mb-8 uppercase tracking-widest">
-            Distributed Email Scheduling Engine
-          </p>
-          <div className="space-y-3">
-            <button
-              onClick={handleOpenGoogleLogin}
-              className="w-full px-6 py-3 bg-[#D63A35] text-white font-mono font-bold text-sm border-blueprint-interactive cursor-pointer hover:bg-[#E86A65]"
-            >
-              SIGN IN WITH GOOGLE
-            </button>
+
+          <h1 style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Login</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 24 }}>Use your ReachInbox account.</p>
+
+          <button
+            onClick={handleOpenGoogleLogin}
+            className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-lg font-semibold text-sm transition-colors mb-4"
+            style={{ background: 'var(--accent-light)', color: 'var(--accent)', border: '1px solid var(--border)' }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            Login with Google
+          </button>
+
+          <div className="flex items-center gap-3 my-4">
+            <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
+            <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>or sign up through email</span>
+            <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
+          </div>
+
+          <div className="text-left">
             <button
               onClick={handleDevLogin}
-              className="w-full px-6 py-3 bg-[#E8DDD3] text-[#1F2736] font-mono font-bold text-sm border-blueprint-interactive cursor-pointer"
+              className="btn-primary w-full"
             >
-              QUICK DEV LOGIN
+              Login
             </button>
+            <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 12, textAlign: 'center' }}>
+              Demo mode — click Login to continue
+            </p>
           </div>
         </div>
       </div>
@@ -175,116 +195,26 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-drafting-grid text-[#1F2736]">
-      <Header
+    <div className="flex min-h-screen" style={{ background: 'var(--bg-primary)' }}>
+      <Sidebar
         user={user}
+        activeTab={activeTab}
+        scheduledCount={scheduledEmails.length}
+        sentCount={sentEmails.filter(e => e.status === 'SENT').length}
+        onTabChange={setActiveTab}
+        onCompose={() => setIsComposeOpen(true)}
+        onSenders={() => setIsSendersOpen(true)}
         onLogout={handleLogout}
-        onOpenGoogleLogin={handleOpenGoogleLogin}
-        onDevLogin={handleDevLogin}
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8">
-        {/* Metric Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-[#F7F1EB] border-blueprint p-5 flex items-center justify-between">
-            <div>
-              <span className="text-xs font-mono font-bold uppercase text-[#445166]">SCHEDULED IN QUEUE</span>
-              <div className="text-3xl font-bold font-serif-display text-[#1F2736] mt-1">{scheduledEmails.length}</div>
-            </div>
-            <div className="p-3 bg-[#E8DDD3] border-blueprint-sm">
-              <Clock className="w-6 h-6 text-[#1F2736]" />
-            </div>
-          </div>
-
-          <div className="bg-[#F7F1EB] border-blueprint p-5 flex items-center justify-between">
-            <div>
-              <span className="text-xs font-mono font-bold uppercase text-[#445166]">COMPLETED DELIVERIES</span>
-              <div className="text-3xl font-bold font-serif-display text-[#D63A35] mt-1">
-                {sentEmails.filter((e) => e.status === 'SENT').length}
-              </div>
-            </div>
-            <div className="p-3 bg-[#E8DDD3] border-blueprint-sm">
-              <Send className="w-6 h-6 text-[#D63A35]" />
-            </div>
-          </div>
-
-          <div className="bg-[#F7F1EB] border-blueprint p-5 flex items-center justify-between">
-            <div>
-              <span className="text-xs font-mono font-bold uppercase text-[#445166]">ACTIVE SENDERS</span>
-              <div className="text-3xl font-bold font-serif-display text-[#1F2736] mt-1">{senders.length}</div>
-            </div>
-            <button
-              onClick={() => setIsSendersOpen(true)}
-              className="p-3 bg-[#E8DDD3] hover:bg-[#D63A35] hover:text-white transition-colors border-blueprint-sm cursor-pointer"
-              title="Manage Senders"
-            >
-              <Users className="w-6 h-6" />
-            </button>
-          </div>
-
-          <div className="bg-[#F7F1EB] border-blueprint p-5 flex items-center justify-between">
-            <div>
-              <span className="text-xs font-mono font-bold uppercase text-[#445166]">SCHEDULER ENGINE</span>
-              <div className="text-sm font-bold font-mono text-emerald-800 mt-1 flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-ping inline-block" />
-                BULLMQ ACTIVE
-              </div>
-            </div>
-            <div className="p-3 bg-[#E8DDD3] border-blueprint-sm">
-              <Zap className="w-6 h-6 text-[#1F2736]" />
-            </div>
-          </div>
+      <main className="flex-1 ml-0 md:ml-64 p-4 md:p-8">
+        <div className="max-w-6xl mx-auto">
+          {activeTab === 'scheduled' ? (
+            <ScheduledTable emails={scheduledEmails} loading={loadingScheduled} onRefresh={fetchScheduled} />
+          ) : (
+            <SentTable emails={sentEmails} loading={loadingSent} onRefresh={fetchSent} />
+          )}
         </div>
-
-        {/* Action Controls */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-2 bg-[#E8DDD3] p-1.5 border-blueprint-sm">
-            <button
-              onClick={() => setActiveTab('scheduled')}
-              className={`px-5 py-2.5 font-mono text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'scheduled'
-                  ? 'bg-[#1F2736] text-[#F3ECE5] border-blueprint-sm'
-                  : 'text-[#1F2736] hover:bg-[#F3ECE5]'
-              }`}
-            >
-              SCHEDULED ({scheduledEmails.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('sent')}
-              className={`px-5 py-2.5 font-mono text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'sent'
-                  ? 'bg-[#1F2736] text-[#F3ECE5] border-blueprint-sm'
-                  : 'text-[#1F2736] hover:bg-[#F3ECE5]'
-              }`}
-            >
-              SENT ({sentEmails.length})
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsSendersOpen(true)}
-              className="px-4 py-2.5 bg-[#E8DDD3] text-[#1F2736] font-mono font-bold text-xs border-blueprint-interactive flex items-center gap-2 cursor-pointer"
-            >
-              <Users className="w-4 h-4" />
-              SENDERS
-            </button>
-            <button
-              onClick={() => setIsComposeOpen(true)}
-              className="px-6 py-2.5 bg-[#D63A35] text-white font-mono font-bold text-xs border-blueprint-interactive flex items-center gap-2 cursor-pointer hover:bg-[#E86A65]"
-            >
-              <Plus className="w-4 h-4" />
-              COMPOSE NEW EMAIL
-            </button>
-          </div>
-        </div>
-
-        {/* Tab Content */}
-        {activeTab === 'scheduled' ? (
-          <ScheduledTable emails={scheduledEmails} loading={loadingScheduled} onRefresh={fetchScheduled} />
-        ) : (
-          <SentTable emails={sentEmails} loading={loadingSent} onRefresh={fetchSent} />
-        )}
       </main>
 
       <ComposeModal
@@ -301,27 +231,18 @@ export default function DashboardPage() {
         onSenderCreated={refreshAllData}
       />
 
-      {/* Toast */}
       {toast && (
-        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 border-2 font-mono text-xs max-w-sm ${
-          toast.type === 'success'
-            ? 'bg-emerald-100 border-emerald-600 text-emerald-800'
-            : 'bg-red-100 border-red-600 text-red-800'
-        }`}>
+        <div
+          className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg text-sm font-medium"
+          style={{
+            background: toast.type === 'success' ? 'var(--success-light)' : 'var(--danger-light)',
+            color: toast.type === 'success' ? '#166534' : '#991b1b',
+            border: `1px solid ${toast.type === 'success' ? 'var(--success)' : 'var(--danger)'}`,
+          }}
+        >
           {toast.message}
         </div>
       )}
-
-      <footer className="w-full bg-[#1F232B] text-[#F3ECE5] border-t-4 border-[#1F2736] py-6 px-8 mt-auto">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 font-mono text-xs">
-          <div>
-            <span className="font-bold text-[#D63A35]">REACHINBOX</span> // DISTRIBUTED EMAIL SCHEDULER
-          </div>
-          <div className="text-[#798392]">
-            BullMQ Persistent Queues • Redis Rate Limiting • Ethereal SMTP
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
