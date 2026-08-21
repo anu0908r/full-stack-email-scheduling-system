@@ -32,7 +32,8 @@ export class AuthController {
    */
   public static async googleCallback(req: Request, res: Response): Promise<void> {
     try {
-      const { code, credential } = req.body;
+      const code = (req.query.code as string) || req.body?.code;
+      const credential = (req.query.credential as string) || req.body?.credential;
       let googleId = '';
       let email = '';
       let name = '';
@@ -96,15 +97,9 @@ export class AuthController {
         { expiresIn: '7d' }
       );
 
-      res.json({
-        token,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          avatar: user.avatar,
-        },
-      });
+      // Redirect to frontend with token in URL
+      const frontendUrl = config.frontendUrl || 'http://localhost:3000';
+      res.redirect(`${frontendUrl}/auth/callback?token=${token}&name=${encodeURIComponent(user.name)}&email=${encodeURIComponent(user.email)}&avatar=${encodeURIComponent(user.avatar || '')}`);
     } catch (err: any) {
       console.error('[Google OAuth Error]', err.message);
       res.status(500).json({ error: 'Authentication failed. Please try again.' });

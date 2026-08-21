@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { authService } from '../../../services/api';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -11,7 +10,7 @@ export default function AuthCallbackPage() {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    const code = searchParams.get('code');
+    const token = searchParams.get('token');
     const error = searchParams.get('error');
 
     if (error) {
@@ -20,34 +19,24 @@ export default function AuthCallbackPage() {
       return;
     }
 
-    if (!code) {
+    if (!token) {
       setStatus('error');
-      setErrorMsg('No authorization code received.');
+      setErrorMsg('No authentication token received.');
       return;
     }
 
-    const exchangeCode = async () => {
-      try {
-        const result = await authService.googleCallback({ code });
-        localStorage.setItem('reachinbox_jwt_token', result.token);
-        setStatus('success');
-        setTimeout(() => router.push('/'), 1000);
-      } catch (err: any) {
-        setStatus('error');
-        setErrorMsg(err.response?.data?.error || err.message || 'Authentication failed.');
-      }
-    };
-
-    exchangeCode();
+    localStorage.setItem('reachinbox_jwt_token', token);
+    setStatus('success');
+    setTimeout(() => router.push('/'), 1000);
   }, [searchParams, router]);
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-drafting-grid flex items-center justify-center font-mono text-[#1F2736]">
-        <div className="p-8 bg-[#F7F1EB] border-blueprint text-center max-w-sm">
-          <div className="w-10 h-10 border-4 border-[#1F2736] border-t-transparent animate-spin mx-auto mb-4" />
-          <p className="font-bold text-sm">EXCHANGING GOOGLE AUTHORIZATION...</p>
-          <p className="text-xs text-[#445166] mt-2">Verifying OAuth code with Google servers</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
+        <div className="card p-8 text-center max-w-sm">
+          <div className="spinner mx-auto mb-4" style={{ width: 32, height: 32, borderWidth: 3 }} />
+          <p style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>Signing you in...</p>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Verifying with Google</p>
         </div>
       </div>
     );
@@ -55,15 +44,15 @@ export default function AuthCallbackPage() {
 
   if (status === 'error') {
     return (
-      <div className="min-h-screen bg-drafting-grid flex items-center justify-center font-mono text-[#1F2736]">
-        <div className="p-8 bg-[#F7F1EB] border-blueprint text-center max-w-sm">
-          <p className="font-bold text-sm text-[#D63A35] mb-2">AUTHENTICATION FAILED</p>
-          <p className="text-xs text-[#445166] mb-4">{errorMsg}</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
+        <div className="card p-8 text-center max-w-sm">
+          <p style={{ fontWeight: 600, fontSize: 14, color: 'var(--danger)', marginBottom: 8 }}>Authentication Failed</p>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>{errorMsg}</p>
           <button
             onClick={() => router.push('/')}
-            className="px-4 py-2 bg-[#1F2736] text-[#F3ECE5] font-mono text-xs font-bold border-blueprint-interactive cursor-pointer"
+            className="btn-primary"
           >
-            RETURN TO DASHBOARD
+            Back to Login
           </button>
         </div>
       </div>
@@ -71,10 +60,10 @@ export default function AuthCallbackPage() {
   }
 
   return (
-    <div className="min-h-screen bg-drafting-grid flex items-center justify-center font-mono text-[#1F2736]">
-      <div className="p-8 bg-[#F7F1EB] border-blueprint text-center max-w-sm">
-        <p className="font-bold text-sm text-emerald-700 mb-2">LOGIN SUCCESSFUL</p>
-        <p className="text-xs text-[#445166]">Redirecting to dashboard...</p>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
+      <div className="card p-8 text-center max-w-sm">
+        <p style={{ fontWeight: 600, fontSize: 14, color: 'var(--success)', marginBottom: 8 }}>Login Successful</p>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Redirecting to dashboard...</p>
       </div>
     </div>
   );
