@@ -107,7 +107,7 @@ export class AuthController {
       });
     } catch (err: any) {
       console.error('[Google OAuth Error]', err.message);
-      res.status(500).json({ error: `Authentication failed: ${err.message}` });
+      res.status(500).json({ error: 'Authentication failed. Please try again.' });
     }
   }
 

@@ -170,16 +170,6 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
-
-        {toast && (
-          <div className={`fixed bottom-6 right-6 px-4 py-3 border-2 font-mono text-xs ${
-            toast.type === 'success'
-              ? 'bg-emerald-100 border-emerald-600 text-emerald-800'
-              : 'bg-red-100 border-red-600 text-red-800'
-          }`}>
-            {toast.message}
-          </div>
-        )}
       </div>
     );
   }

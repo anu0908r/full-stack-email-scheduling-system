@@ -58,7 +58,7 @@ export const createEmailWorker = () => {
       }
 
       const senderId = email.senderId;
-      const hourlyLimit = email.sender?.hourlyLimit || config.maxEmailsPerHourPerSender;
+      const hourlyLimit = email.sender?.hourlyLimit ?? config.maxEmailsPerHourPerSender;
 
       // 4. Per-Sender Throttling Check (Minimum delay between emails)
       const throttleCheck = await RateLimiterService.checkAndSetSenderDelayLock(senderId, config.minEmailDelayMs);
@@ -130,7 +130,7 @@ export const createEmailWorker = () => {
 
         console.log(`[Worker Success] Email ${emailId} successfully sent to ${email.recipient}!`);
 
-        // Check if Campaign is fully completed
+        // Check if Campaign is fully completed or failed
         const pendingCount = await prisma.email.count({
           where: {
             campaignId: email.campaignId,
@@ -139,11 +139,21 @@ export const createEmailWorker = () => {
         });
 
         if (pendingCount === 0) {
+          // Check if any emails in this campaign are SENT (success) vs all FAILED
+          const sentCount = await prisma.email.count({
+            where: {
+              campaignId: email.campaignId,
+              status: 'SENT',
+            },
+          });
+
+          const campaignStatus = sentCount > 0 ? 'COMPLETED' : 'FAILED';
+
           await prisma.campaign.update({
             where: { id: email.campaignId },
-            data: { status: 'COMPLETED' },
+            data: { status: campaignStatus },
           });
-          console.log(`[Campaign Completed] All emails for campaign ${email.campaignId} finished.`);
+          console.log(`[Campaign ${campaignStatus}] All emails for campaign ${email.campaignId} finished. (${sentCount} sent)`);
         }
       } catch (err: any) {
         console.error(`[Worker Failure] Failed sending email ${emailId}: ${err.message}`);
@@ -155,6 +165,26 @@ export const createEmailWorker = () => {
             errorMessage: err.message || 'SMTP delivery failure',
           },
         });
+
+        // After this failure, check if all campaign emails are done (no more SCHEDULED/PROCESSING)
+        const pendingCount = await prisma.email.count({
+          where: {
+            campaignId: email.campaignId,
+            status: { in: ['SCHEDULED', 'PROCESSING'] },
+          },
+        });
+
+        if (pendingCount === 0) {
+          const sentCount = await prisma.email.count({
+            where: { campaignId: email.campaignId, status: 'SENT' },
+          });
+          const campaignStatus = sentCount > 0 ? 'COMPLETED' : 'FAILED';
+          await prisma.campaign.update({
+            where: { id: email.campaignId },
+            data: { status: campaignStatus },
+          });
+          console.log(`[Campaign ${campaignStatus}] All emails for campaign ${email.campaignId} finished.`);
+        }
 
         throw err; // Allow BullMQ attempt retry strategy if configured
       }

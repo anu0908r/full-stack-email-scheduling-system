@@ -19,10 +19,12 @@ export interface SendMailResult {
 }
 
 // Memory cache for auto-generated Ethereal accounts per sender email
-const etherealAccountsCache = new Map<string, { user: string; pass: string }>();
+const etherealAccountsCache = new Map<string, { user: string; pass: string; expiresAt: number }>();
 
 // Cache SMTP transporters per sender config to avoid recreating per email
-const transporterCache = new Map<string, nodemailer.Transporter>();
+const transporterCache = new Map<string, { transporter: nodemailer.Transporter; expiresAt: number }>();
+
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 function getTransporterKey(host: string, port: number, user: string, pass: string): string {
   return `${host}:${port}:${user}:${pass}`;
@@ -45,8 +47,8 @@ export const sendEmailViaSMTP = async (options: SendMailOptions): Promise<SendMa
 
   // If no user/pass configured in environment or sender record, generate Ethereal test account dynamically
   if (!user || !pass) {
-    if (etherealAccountsCache.has(options.senderEmail)) {
-      const cached = etherealAccountsCache.get(options.senderEmail)!;
+    const cached = etherealAccountsCache.get(options.senderEmail);
+    if (cached && Date.now() < cached.expiresAt) {
       user = cached.user;
       pass = cached.pass;
     } else {
@@ -55,21 +57,24 @@ export const sendEmailViaSMTP = async (options: SendMailOptions): Promise<SendMa
       port = 587;
       user = testAccount.user;
       pass = testAccount.pass;
-      etherealAccountsCache.set(options.senderEmail, { user, pass });
+      etherealAccountsCache.set(options.senderEmail, { user, pass, expiresAt: Date.now() + CACHE_TTL_MS });
       console.log(`[Ethereal SMTP] Created dynamic test account for ${options.senderEmail}: ${user}`);
     }
   }
 
   const cacheKey = getTransporterKey(host, port, user!, pass!);
-  let transporter = transporterCache.get(cacheKey);
-  if (!transporter) {
+  const cachedTransporter = transporterCache.get(cacheKey);
+  let transporter: nodemailer.Transporter;
+  if (cachedTransporter && Date.now() < cachedTransporter.expiresAt) {
+    transporter = cachedTransporter.transporter;
+  } else {
     transporter = nodemailer.createTransport({
       host,
       port,
       secure: port === 465,
       auth: { user, pass },
     });
-    transporterCache.set(cacheKey, transporter);
+    transporterCache.set(cacheKey, { transporter, expiresAt: Date.now() + CACHE_TTL_MS });
   }
 
   // HTML-escape body to prevent injection, then convert newlines to <br/>

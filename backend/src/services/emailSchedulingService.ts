@@ -54,7 +54,7 @@ export class EmailSchedulingService {
       throw new Error(`Sender with ID ${params.senderId} not found.`);
     }
 
-    if (sender.userId && sender.userId !== params.userId) {
+    if (sender.userId !== null && sender.userId !== params.userId) {
       throw new Error(`Sender with ID ${params.senderId} does not belong to this user.`);
     }
 
