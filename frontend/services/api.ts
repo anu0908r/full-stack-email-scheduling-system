@@ -23,8 +23,11 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && typeof window !== 'undefined') {
+      const hadToken = localStorage.getItem('reachinbox_jwt_token');
       localStorage.removeItem('reachinbox_jwt_token');
-      window.location.reload();
+      if (hadToken) {
+        window.location.reload();
+      }
     }
     return Promise.reject(error);
   }
